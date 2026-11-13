@@ -60,6 +60,7 @@ export const modules = [
       f("area", "Area (sq ft)", "number", { min: 0 }),
       amount("rent", "Monthly asking rent", true),
       amount("deposit", "Security deposit"),
+      choice("listing", "Website listing", ["Private", "Public"]),
       notes,
     ],
     action: { label: "Take off market", to: "Unavailable", from: ["Vacant"] },
@@ -494,6 +495,31 @@ export const commonFeatures = [
 export const featureCatalog = modules.flatMap((m) =>
   [...commonFeatures, m.action.label].map((label, i) => ({
     id: `${m.id}-${i + 1}`,
+    module: m.id,
+    label: `${m.label}: ${label}`,
+  })),
+);
+
+export const additionalWorkflows = [
+  "Choose visible columns",
+  "Adjust table density",
+  "Choose page size",
+  "Filter by a field value",
+  "Filter by creation date range",
+  "Filter by numeric range",
+  "Select multiple records",
+  "Bulk archive records",
+  "Bulk restore records",
+  "Bulk update statuses",
+  "Duplicate a record",
+  "Save and load named views",
+  "Bookmark records",
+  "Add internal record comments",
+  "View per-record change history",
+];
+export const expandedFeatureCatalog = modules.flatMap((m) =>
+  additionalWorkflows.map((label, i) => ({
+    id: `${m.id}-extra-${i + 1}`,
     module: m.id,
     label: `${m.label}: ${label}`,
   })),

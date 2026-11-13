@@ -110,9 +110,22 @@ const I = {
   X,
   RotateCcw,
 };
-import { modules, moduleMap, featureCatalog } from "../shared/modules";
+import {
+  modules,
+  moduleMap,
+  featureCatalog as baseFeatureCatalog,
+  expandedFeatureCatalog,
+} from "../shared/modules";
+const featureCatalog = [...baseFeatureCatalog, ...expandedFeatureCatalog];
+import {
+  useModulePreferences,
+  AdvancedModuleBar,
+  RecordCollaboration,
+  defaultView,
+} from "./ModuleTools.jsx";
 import "./style.css";
 import HomePage from "./Home.jsx";
+import PublicApplications from "./PublicApplications.jsx";
 import Portal from "./Portal.jsx";
 import "./portals.css";
 const Icon = ({ name, size = 18, ...props }) => {
@@ -302,6 +315,20 @@ function App() {
   const get = (id) => records.find((r) => r.id === id);
   const of = (m) => active.filter((r) => r.module === m);
   const m = moduleMap[page];
+  const [advancedView, setAdvancedView] = useState({ ...defaultView });
+  const [selected, setSelected] = useState([]);
+  const [prefs, updatePrefs, prefsReady] = useModulePreferences(
+    api,
+    m?.id,
+    user?.id,
+  );
+  useEffect(() => {
+    setAdvancedView({ ...defaultView });
+    setSelected([]);
+  }, [page]);
+  useEffect(() => {
+    setSelected([]);
+  }, [archive, query, status, state?.records]);
   function exportRecords(module, rows) {
     const cols = [
       "name",
@@ -348,6 +375,37 @@ function App() {
             .toLowerCase()
             .includes(query.toLowerCase()),
       )
+      .filter((r) => {
+        if (
+          advancedView.field &&
+          advancedView.match &&
+          !String(r[advancedView.field] ?? "")
+            .toLowerCase()
+            .includes(advancedView.match.toLowerCase())
+        )
+          return false;
+        if (advancedView.from && r.createdAt.slice(0, 10) < advancedView.from)
+          return false;
+        if (advancedView.to && r.createdAt.slice(0, 10) > advancedView.to)
+          return false;
+        if (
+          advancedView.bookmarksOnly &&
+          !(prefs.bookmarks || []).includes(r.id)
+        )
+          return false;
+        const numeric = Number(r[advancedView.numeric]);
+        if (
+          advancedView.min !== "" &&
+          (!Number.isFinite(numeric) || numeric < Number(advancedView.min))
+        )
+          return false;
+        if (
+          advancedView.max !== "" &&
+          (!Number.isFinite(numeric) || numeric > Number(advancedView.max))
+        )
+          return false;
+        return true;
+      })
       .sort((a, b) => {
         const av = a[sort] ?? "",
           bv = b[sort] ?? "";
@@ -357,13 +415,35 @@ function App() {
             : String(av).localeCompare(String(bv));
         return direction === "asc" ? cmp : -cmp;
       });
-  }, [records, page, query, status, archive, sort, direction]);
+  }, [
+    records,
+    page,
+    query,
+    status,
+    archive,
+    sort,
+    direction,
+    advancedView,
+    prefs.bookmarks,
+  ]);
   if (!ready)
     return (
       <div className="loading">
         <Logo />
         <span>Opening your workspace…</span>
       </div>
+    );
+  if (route.startsWith("/apply"))
+    return (
+      <PublicApplications
+        Logo={Logo}
+        user={user}
+        api={api}
+        onHome={() => navigate("/")}
+        onSignIn={() => navigate("/signin")}
+        onDashboard={() => navigate("/dashboard")}
+        onApply={() => navigate("/apply")}
+      />
     );
   if (route === "/" && !authIntent)
     return (
@@ -372,6 +452,10 @@ function App() {
         user={user}
         onSignIn={() => navigate("/signin")}
         onDashboard={() => navigate("/dashboard")}
+        onApply={(id) =>
+          navigate("/apply" + (id ? "?unit=" + encodeURIComponent(id) : ""))
+        }
+        api={api}
       />
     );
   if (!user)
@@ -442,7 +526,7 @@ function App() {
       team: "Give the right people the right access.",
       settings: "Make this workspace feel like your business.",
       features:
-        "Explore the 200 module capabilities available in your workspace.",
+        "Explore the 500 module capabilities available in your workspace.",
     }[page];
   async function logout() {
     try {
@@ -752,12 +836,64 @@ function App() {
     return String(r[f.key] ?? "") || "—";
   }
   function recordTable() {
-    const cols = m.fields
-        .filter((f) => f.key !== "name" && f.type !== "textarea")
-        .slice(0, 3),
-      pages = Math.max(1, Math.ceil(visible.length / 12));
+    const hasAdvancedFilters =
+      advancedView.match ||
+      advancedView.from ||
+      advancedView.to ||
+      advancedView.min !== "" ||
+      advancedView.max !== "" ||
+      advancedView.bookmarksOnly;
+    const defaultColumns = m.fields
+      .filter((f) => f.key !== "name" && f.type !== "textarea")
+      .slice(0, 3)
+      .map((f) => f.key);
+    const cols = m.fields.filter((f) =>
+      (prefs.columns || defaultColumns).includes(f.key),
+    );
+    const pageSize = [12, 24, 48, 100].includes(prefs.pageSize)
+      ? prefs.pageSize
+      : 12;
+    const pages = Math.max(1, Math.ceil(visible.length / pageSize));
     return (
-      <section className="panel records">
+      <section
+        className={
+          "panel records " + (prefs.density === "compact" ? "dense" : "")
+        }
+      >
+        <AdvancedModuleBar
+          m={m}
+          records={records}
+          view={advancedView}
+          setView={(v) => {
+            setAdvancedView(v);
+            setPageNum(1);
+          }}
+          prefs={prefs}
+          updatePrefs={updatePrefs}
+          selected={selected}
+          setSelected={setSelected}
+          canEdit={canEdit}
+          selectionRows={visible}
+          ready={prefsReady}
+          bulk={(operation, status) =>
+            setModal({
+              type: "bulk",
+              module: m.id,
+              operation,
+              status,
+              items: visible
+                .filter((r) => selected.includes(r.id))
+                .map((r) => ({ id: r.id, version: r.version, name: r.name })),
+            })
+          }
+          onClone={(r) =>
+            setModal({
+              type: "edit",
+              module: m.id,
+              clone: { ...r, name: r.name + " (copy)" },
+            })
+          }
+        />
         <div className="table-tools">
           <div className="searchbox">
             <Icon name="Search" size={16} />
@@ -829,6 +965,26 @@ function App() {
               <table>
                 <thead>
                   <tr>
+                    <th>
+                      <input
+                        type="checkbox"
+                        aria-label="Select first 100 filtered records"
+                        checked={
+                          visible.length > 0 &&
+                          visible
+                            .slice(0, 100)
+                            .every((r) => selected.includes(r.id))
+                        }
+                        onChange={(e) =>
+                          setSelected(
+                            e.target.checked
+                              ? visible.slice(0, 100).map((r) => r.id)
+                              : [],
+                          )
+                        }
+                      />
+                    </th>
+                    <th>Saved</th>
                     <th>{m.singular}</th>
                     {cols.map((f) => (
                       <th key={f.key}>{f.label}</th>
@@ -841,11 +997,46 @@ function App() {
                 <tbody>
                   {visible
                     .slice(
-                      (Math.min(pageNum, pages) - 1) * 12,
-                      Math.min(pageNum, pages) * 12,
+                      (Math.min(pageNum, pages) - 1) * pageSize,
+                      Math.min(pageNum, pages) * pageSize,
                     )
                     .map((r) => (
                       <tr key={r.id}>
+                        <td>
+                          <input
+                            aria-label={"Select " + r.name}
+                            type="checkbox"
+                            checked={selected.includes(r.id)}
+                            onChange={(e) =>
+                              setSelected(
+                                e.target.checked
+                                  ? [...selected, r.id].slice(0, 100)
+                                  : selected.filter((id) => id !== r.id),
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          <button
+                            className="bookmark-button"
+                            aria-label={"Bookmark " + r.name}
+                            disabled={!prefsReady}
+                            aria-pressed={(prefs.bookmarks || []).includes(
+                              r.id,
+                            )}
+                            onClick={() =>
+                              updatePrefs({
+                                bookmarks: (prefs.bookmarks || []).includes(
+                                  r.id,
+                                )
+                                  ? prefs.bookmarks.filter((id) => id !== r.id)
+                                  : [...(prefs.bookmarks || []), r.id],
+                              })
+                            }
+                          >
+                            {(prefs.bookmarks || []).includes(r.id) ? "★" : "☆"}
+                          </button>
+                        </td>
                         <td>
                           <button
                             className="record-name"
@@ -912,10 +1103,10 @@ function App() {
           empty(
             archive
               ? "Nothing archived yet."
-              : query || status !== "all"
+              : query || status !== "all" || hasAdvancedFilters
                 ? "No matching records."
                 : "A fresh start.",
-            query || status !== "all"
+            query || status !== "all" || hasAdvancedFilters
               ? "Try a different search or status."
               : "Create a record to get started.",
           )
@@ -1345,7 +1536,7 @@ function App() {
             </p>
             <button onClick={() => go("features")}>
               <Icon name="Grid2X2" />
-              Explore 200 capabilities
+              Explore 500 capabilities
             </button>
           </div>
         </section>
@@ -1358,10 +1549,11 @@ function App() {
         <div className="feature-banner">
           <Icon name="Blocks" size={30} />
           <div>
-            <h2>20 modules. 200 documented capabilities.</h2>
+            <h2>20 modules. 500 documented capabilities.</h2>
             <p>
-              Each module supports nine record workflows plus one domain action.
-              Shared account and reporting tools are additional.
+              Each module supports its original ten workflows plus fifteen
+              additional tools. Shared account and reporting tools are
+              additional.
             </p>
           </div>
         </div>
@@ -1751,7 +1943,7 @@ function Badge({ value }) {
           ? "red"
           : amber.includes(value)
             ? "amber"
-            : "green")
+            : "positive")
       }
     >
       <i />
@@ -2082,7 +2274,7 @@ function Modal({
                 <select
                   name={f.key}
                   required={f.required}
-                  defaultValue={record?.[f.key] || ""}
+                  defaultValue={(record || modal.clone)?.[f.key] || ""}
                 >
                   <option value="">
                     Select {moduleMap[f.module].singular}…
@@ -2098,7 +2290,9 @@ function Modal({
               ) : f.type === "select" ? (
                 <select
                   name={f.key}
-                  defaultValue={record?.[f.key] || f.options[0]}
+                  defaultValue={
+                    (record || modal.clone)?.[f.key] || f.options[0]
+                  }
                 >
                   {f.options.map((o) => (
                     <option key={o}>{o}</option>
@@ -2107,7 +2301,7 @@ function Modal({
               ) : f.type === "textarea" ? (
                 <textarea
                   name={f.key}
-                  defaultValue={record?.[f.key] || ""}
+                  defaultValue={(record || modal.clone)?.[f.key] || ""}
                   required={f.required}
                   rows={3}
                   maxLength={10000}
@@ -2129,7 +2323,7 @@ function Modal({
                         ? "any"
                         : undefined
                   }
-                  defaultValue={record?.[f.key] ?? ""}
+                  defaultValue={(record || modal.clone)?.[f.key] ?? ""}
                   required={f.required}
                   maxLength={500}
                 />
@@ -2191,6 +2385,14 @@ function Modal({
               </div>
             ))}
         </dl>
+        {record.publicReference && (
+          <div className="public-reference">
+            <b>Application reference</b>
+            <span>{record.publicReference}</span>
+            <small>Submitted through the public website</small>
+          </div>
+        )}
+        <RecordCollaboration api={api} record={record} canEdit={canEdit} />
         <div className="record-meta">
           Created {new Date(record.createdAt).toLocaleString()}
           <br />
@@ -2250,6 +2452,50 @@ function Modal({
             </button>
           </div>
         )}
+      </>
+    );
+  }
+  if (modal.type === "bulk") {
+    title = "Confirm bulk " + modal.operation;
+    subtitle = `${modal.items.length} ${m.label.toLowerCase()} will be updated together.`;
+    body = (
+      <>
+        <p className="modal-copy">
+          {modal.operation === "status"
+            ? "Set status to " + modal.status + ". "
+            : ""}
+          All selected records must pass validation. If any record is blocked or
+          has changed, the whole operation is cancelled.
+        </p>
+        <ul className="bulk-summary">
+          {modal.items.slice(0, 6).map((r) => (
+            <li key={r.id}>{r.name}</li>
+          ))}
+        </ul>
+        <div className="modal-actions">
+          <button onClick={close}>Cancel</button>
+          <button
+            className="primary"
+            disabled={busy || !modal.items.length}
+            onClick={() =>
+              mutate(
+                "/bulk/" + m.id,
+                {
+                  operation: modal.operation,
+                  status: modal.status,
+                  items: modal.items.map((r) => ({
+                    id: r.id,
+                    version: r.version,
+                  })),
+                },
+                "POST",
+                "Bulk operation completed",
+              )
+            }
+          >
+            Confirm bulk update
+          </button>
+        </div>
       </>
     );
   }

@@ -89,6 +89,53 @@ try {
       .click();
     await page.getByRole("heading", { name: m.label, exact: true }).waitFor();
     await page
+      .getByLabel("Table density", { exact: true })
+      .selectOption("compact");
+    await page
+      .getByLabel("Records per page", { exact: true })
+      .selectOption("24");
+    await page
+      .getByRole("button", { name: "Advanced tools", exact: true })
+      .click();
+    await page.getByLabel("Filter field", { exact: true }).selectOption("name");
+    await page
+      .getByLabel("Field contains", { exact: true })
+      .fill("NO ADVANCED MATCH");
+    await page.getByRole("heading", { name: "No matching records." }).waitFor();
+    await page.getByLabel("Field contains", { exact: true }).fill("");
+    await page.getByLabel("Created from", { exact: true }).fill("2000-01-01");
+    await page
+      .getByLabel("Created through", { exact: true })
+      .fill("2100-01-01");
+    await page.getByLabel("Minimum", { exact: true }).fill("1");
+    await page.getByLabel("Maximum", { exact: true }).fill("100");
+    await page.getByLabel("New view name", { exact: true }).fill("QA " + m.id);
+    await page.getByRole("button", { name: "Save view", exact: true }).click();
+    await page
+      .getByLabel("Saved views", { exact: true })
+      .selectOption("QA " + m.id);
+    await page
+      .getByRole("button", { name: "Reset filters", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Advanced tools", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: /^Bookmark / })
+      .first()
+      .click();
+    await page.getByRole("button", { name: "Bookmarked", exact: true }).click();
+    assert.equal(await page.locator("tbody tr").count(), 1);
+    await page.getByRole("button", { name: "Bookmarked", exact: true }).click();
+    await page
+      .getByLabel("Select first 100 filtered records", { exact: true })
+      .check();
+    await page
+      .locator(".bulk-bar")
+      .getByRole("button", { name: "Clear", exact: true })
+      .click();
+
+    await page
       .getByLabel("Search records", { exact: true })
       .fill("NO MATCHING RECORD");
     await page.getByRole("heading", { name: "No matching records." }).waitFor();
@@ -129,6 +176,17 @@ try {
   await page
     .getByRole("button", { name: "Browser verified task", exact: true })
     .click();
+  await page
+    .getByLabel("Internal comment", { exact: true })
+    .fill("Browser comment for this task.");
+  await page.getByRole("button", { name: "Add comment", exact: true }).click();
+  await page
+    .getByText("Browser comment for this task.", { exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Record history", exact: true })
+    .click();
+  await page.getByText("Added internal comment", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Start task", exact: true }).click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   await page
@@ -165,13 +223,37 @@ try {
     .getByRole("button", { name: "Restore record", exact: true })
     .click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Archived", exact: true }).click();
+  await page.getByLabel("Select Browser updated task", { exact: true }).check();
+  await page
+    .getByRole("button", { name: "Duplicate selected", exact: true })
+    .click();
+  await page.getByLabel("Name / title").fill("Browser duplicate task");
+  await page.getByRole("button", { name: "Create task", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page
+    .getByLabel("Select Browser duplicate task", { exact: true })
+    .check();
+  await page.getByLabel("Bulk status", { exact: true }).selectOption("Done");
+  await page
+    .getByRole("button", { name: "Confirm bulk update", exact: true })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page
+    .getByLabel("Select Browser duplicate task", { exact: true })
+    .check();
+  await page.getByRole("button", { name: "Bulk archive", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Confirm bulk update", exact: true })
+    .click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
   await page
     .getByRole("button", { name: "Settings & help", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Explore 200 capabilities", exact: true })
+    .getByRole("button", { name: "Explore 500 capabilities", exact: true })
     .click();
-  assert.equal(await page.locator(".feature-grid li").count(), 200);
+  assert.equal(await page.locator(".feature-grid li").count(), 500);
   await page.getByRole("button", { name: "Calendar", exact: true }).click();
   await page.locator(".calendar-day").first().waitFor();
   await page.getByLabel("Calendar month").fill("2026-12");
@@ -357,9 +439,41 @@ try {
     ),
     false,
   );
+  await page.getByRole("button", { name: "Applications", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Make an introduction.", exact: true })
+    .waitFor();
+  await page.getByLabel("Full name").fill("Public Prospect");
+  await page.getByLabel("Email address").fill("public-prospect@example.com");
+  await page.getByLabel("Phone number").fill("4165550199");
+  await page.getByLabel("Preferred move-in date").fill("2027-12-01");
+  await page.locator('input[name="consent"]').check();
+  await page
+    .getByRole("button", { name: "Submit application", exact: true })
+    .click();
+  await page
+    .getByRole("heading", {
+      name: "We’ve received your application.",
+      exact: true,
+    })
+    .waitFor();
+  assert.match(
+    await page.locator(".application-success strong").innerText(),
+    /^APL-/,
+  );
+  await page.screenshot({
+    path: "test-results/application-confirmation.png",
+    fullPage: true,
+  });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+    false,
+  );
   assert.deepEqual(errors, []);
   console.log(
-    "Browser checks passed: private one-time activation, sample data, 20 module views/search/filter/sort/export/archive, task create/edit/action/archive/restore, 200 feature entries, calendar, account assignment, unified sign-in, agent and tenant dashboards, tenant requests, mobile navigation and overflow.",
+    "Browser checks passed: private one-time activation, sample data, 20 module views/search/filter/sort/export/archive, task create/edit/action/archive/restore, 500 feature entries, calendar, account assignment, unified sign-in, agent and tenant dashboards, tenant requests, mobile navigation and overflow.",
   );
 } finally {
   await browser?.close();

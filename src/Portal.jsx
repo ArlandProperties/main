@@ -195,7 +195,7 @@ export default function Portal({
           "badge " +
           (["Open", "Pending", "Draft", "Urgent"].includes(r.status)
             ? "amber"
-            : "green")
+            : "positive")
         }
       >
         <i />
@@ -913,6 +913,12 @@ export default function Portal({
             ) : (
               <>
                 <div className="detail-status">{badges(r)}</div>
+                {r.publicReference && (
+                  <div className="public-reference">
+                    <b>Application reference</b>
+                    <span>{r.publicReference}</span>
+                  </div>
+                )}
                 <dl className="details">
                   {(rm?.fields || [])
                     .filter((f) => f.key !== "name" && r[f.key] !== undefined)

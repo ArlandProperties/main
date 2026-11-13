@@ -3,7 +3,12 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { modules, moduleMap, featureCatalog } from "../shared/modules.js";
+import {
+  modules,
+  moduleMap,
+  featureCatalog,
+  expandedFeatureCatalog,
+} from "../shared/modules.js";
 import {
   hashToken,
   token,
@@ -27,6 +32,8 @@ import {
   validateProfile,
   assertAgentAccess,
 } from "./access.js";
+import { installProspectRoutes } from "./public-applications.js";
+import { installModuleTools } from "./module-tools.js";
 const now = () => new Date().toISOString();
 const emailOk = (e) =>
   typeof e === "string" &&
@@ -86,6 +93,7 @@ export function createApp(
     }
     next();
   });
+  installProspectRoutes(app, db);
   const authLimit = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 20,
@@ -358,6 +366,7 @@ export function createApp(
     });
     res.json({ ok: true });
   });
+  installModuleTools(app, db);
   app.get("/api/auth/me", (req, res) =>
     res.json({ user: publicUser(req.user) }),
   );
@@ -415,7 +424,7 @@ export function createApp(
             : modules,
       features: ["agent", "tenant"].includes(req.user.role)
         ? []
-        : featureCatalog,
+        : [...featureCatalog, ...expandedFeatureCatalog],
       records: scopedRecords(req.user, rows.map(decode)),
       user: publicUser(req.user),
       settings: setting
@@ -515,6 +524,79 @@ export function createApp(
       }
     }
   }
+  app.post("/api/bulk/:module", write, async (req, res) => {
+    const m = getModule(req.params.module),
+      { items, operation, status } = req.body;
+    if (
+      !Array.isArray(items) ||
+      !items.length ||
+      items.length > 100 ||
+      items.some(
+        (x) => !x || typeof x.id !== "string" || !Number.isInteger(x.version),
+      ) ||
+      new Set(items.map((x) => x.id)).size !== items.length ||
+      !["archive", "restore", "status"].includes(operation)
+    )
+      fail("Select 1–100 unique records and a valid operation");
+    if (operation === "status" && !m.statuses.includes(status))
+      fail("Choose a valid status");
+    await db.transaction(async (tx) => {
+      for (const item of items) {
+        const r = await read(tx, item.id, m.id);
+        if (r.version !== item.version)
+          fail("A selected record changed. Refresh and try again.", 409);
+        const d = JSON.parse(r.data);
+        await assertAgentAccess(tx, req.user, m, d, r.id);
+        let next = r.status,
+          archived = r.archived;
+        if (operation === "archive") {
+          if (r.archived) fail("A selected record is already archived");
+          if (m.id === "payments" && r.status === "Posted")
+            fail("Posted payments must be retained");
+          if (m.id === "leases" && r.status === "Active")
+            fail("End active leases before archiving");
+          const rows = await tx.query("SELECT * FROM records WHERE archived=0");
+          if (
+            rows.some(
+              (other) =>
+                other.id !== r.id &&
+                moduleMap[other.module]?.fields
+                  .filter((f) => f.type === "reference")
+                  .some((f) => JSON.parse(other.data)[f.key] === r.id),
+            )
+          )
+            fail("Archive linked records first");
+          archived = 1;
+        } else if (operation === "restore") {
+          if (!r.archived) fail("A selected record is already active");
+          await validateReferences(tx, m, d);
+          await rules(tx, m, d, r.status, r.id);
+          archived = 0;
+        } else {
+          if (r.archived) fail("Restore records before changing status");
+          if (
+            (m.id === "payments" && r.status === "Posted") ||
+            (m.id === "invoices" && r.status === "Paid")
+          )
+            fail("Posted payments and paid invoices are locked");
+          if (m.id === "invoices" && ["Draft", "Void"].includes(status)) {
+            const ps = await tx.query(
+              "SELECT data FROM records WHERE module='payments' AND status='Posted' AND archived=0",
+            );
+            if (ps.some((p) => JSON.parse(p.data).invoiceId === r.id))
+              fail("Cannot void an invoice with posted payments");
+          }
+          await validateReferences(tx, m, d);
+          await rules(tx, m, d, status, r.id);
+          next = status;
+        }
+        await update(tx, r, d, next, archived);
+        await related(tx, m, d, d, next, archived);
+        await audit(tx, req.user, "Bulk " + operation, m.id, r.id, d.name);
+      }
+    });
+    res.json({ updated: items.length });
+  });
   app.post("/api/records/:module", write, async (req, res) => {
     const m = getModule(req.params.module),
       data = validate(m, req.body.data);
@@ -546,6 +628,11 @@ export function createApp(
       const old = JSON.parse(r.data),
         data = {
           ...validate(m, req.body.data),
+          ...Object.fromEntries(
+            ["publicReference", "submissionSource", "consentAt"]
+              .filter((k) => old[k])
+              .map((k) => [k, old[k]]),
+          ),
           ...(old.requesterTenantId
             ? {
                 requesterTenantId: old.requesterTenantId,
@@ -834,6 +921,7 @@ export function createApp(
     );
     res.json({
       format: 1,
+      comments: await db.query("SELECT * FROM comments ORDER BY created_at"),
       exportedAt: now(),
       records: (await db.query("SELECT * FROM records")).map(decode),
       audit: await db.query("SELECT * FROM audit ORDER BY created_at"),

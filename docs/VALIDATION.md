@@ -3,7 +3,7 @@
 ## Local checks
 
 - Production Vite build passes.
-- 44 API tests pass using a temporary SQLite database.
+- 70 API tests pass using temporary SQLite databases.
 - All 20 modules: create, read, edit, archive, restore, domain action, and persistence through authenticated requests.
 - One-time and expired activation links, disabled pending accounts, owner setup, secret validation, session authentication, CSRF header/origin checks, viewer permissions, account disablement, administrator password reset, password rotation, logout, and duplicate account checks.
 - Reference validation, linked-record archive guards, HTTPS-only document links, date validation, and optimistic concurrency.
@@ -35,3 +35,9 @@ Run with `npm run test:browser` after `npx playwright install chromium`. To use 
 GitHub Actions runs the API suite against both SQLite and PostgreSQL 16, builds the application, and runs browser checks. The PostgreSQL 16 CI job passed for the preceding release. Portal isolation tests also run in a separate temporary PostgreSQL schema when `TEST_DATABASE_URL` is set. Render deployment and live HTTPS checks must be verified after its reviewed infrastructure plan is approved and applied.
 
 The checks cover implemented behavior; they are not an independent security audit, accessibility certification, financial compliance review, or load test.
+
+## Expanded workflow and prospect checks
+
+The expanded suite exercises durable module preferences, saved views, bookmarks, comments/history, and bulk archive/restore/status operations in all 20 modules. It checks stale-version atomic rollback, malformed bulk items, per-user preferences, read-only account rejection, explicit rental publication, applicant consent, invalid dates, honeypot checks, private-unit rejection, and receipt preservation when staff edits an application. The extra feature catalog contains exactly 300 entries (15 per module).
+
+Browser coverage includes advanced field/date/numeric filters, saved views, per-module bookmarks, density/page size, multi-selection, bulk confirmation, duplication, internal comments/history, 500 catalog entries, and the mobile public application confirmation. Branding checks find no green-family CSS colors.

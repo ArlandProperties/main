@@ -27,6 +27,20 @@ For development, run `npm start` for the API and `npm run dev` in a second termi
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `render.yaml` defines a web service and private PostgreSQL database in Virginia. This is a free evaluation preview: the database expires after 30 days and the web service can spin down when idle. Do not store live tenant records until durable hosting and backups are configured. Creating a Blueprint plan does not deploy it.
 
+## Additional 300 module workflows
+
+The app now adds 15 shared workflows independently to each of the 20 staff modules: configurable columns, table density, page size, field filters, creation-date range, numeric range, multi-selection, bulk archive, bulk restore, bulk status changes, duplication, named saved views, bookmarks, internal comments, and record history. This is **300 additional module-level capabilities**, not 300 unrelated products or integrations. See [docs/ADDITIONAL-FEATURES.md](docs/ADDITIONAL-FEATURES.md). The feature directory lists the original 200 plus these 300, for 500 total. Permissions and financial/relationship locks still apply.
+
+Saved views and bookmarks are private per account and stored on the server. Bulk operations handle up to 100 records atomically and require confirmation. Internal comments are for company staff; they are not sent to residents or delivered as notifications.
+
+## Public applications and rentals
+
+`/apply` is the prospective-tenant Applications page, with no sign-in required. It collects contact details, household size, preferred move-in date, rental preference, and consent. The form creates a New application and returns a confirmation reference; it does not create a tenant account, reserve a unit, or run automatic eligibility decisions. Confirmation emails are not sent automatically. Public submissions are rate limited and validate a honeypot field.
+
+Only units explicitly set to **Website listing: Public**, in Vacant status, under an active property are published. Existing units stay private unless an administrator or authorized agent publishes them. Published data excludes internal notes and ownership records. Applicants may submit a general application without choosing a unit; administrators assign general applications to units before agents can see them under their property scopes.
+
+The homepage includes rental search and bedroom filters, application steps, FAQs, and the shared sign-in link. Branding uses navy, slate, white, and champagne gold; the logo matches the palette.
+
 ## Homepage and sign-in
 
 `/` is the public company homepage. `/signin` is the one sign-in page for all roles. `/dashboard` renders the authenticated account’s administrator, agent, or tenant dashboard; users cannot select or override their role during sign-in. Activation links still use the private `/#activate=...` flow.
@@ -53,7 +67,7 @@ This release is a management ledger, not a payment processor or certified accoun
 
 Notices are prepared and delivery is recorded manually; no emails/SMS are sent. Documents are secure HTTPS links; uploads and virus scanning are not included. There is no public self-registration, e-signature provider, bank feed, payment gateway, tax filing, or automated screening. Accounts share a single company workspace. SSO, MFA, automatic password reset email, multi-company tenancy, and field-by-field permission configuration are not included.
 
-Calendar dates are stored as entered; appointment times use the configured company timezone. CSV values that can trigger spreadsheet formulas are prefixed to make exported text safe. JSON record exports exclude passwords/sessions but contain private business data and should be protected. They are not a database disaster-recovery system; configure provider backups separately.
+Calendar dates are stored as entered; appointment times use the configured company timezone. CSV values that can trigger spreadsheet formulas are prefixed to make exported text safe. JSON record exports include internal comments and exclude passwords/sessions but contain private business data and should be protected. They are not a database disaster-recovery system; configure provider backups separately.
 
 ## Verification
 

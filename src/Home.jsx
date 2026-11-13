@@ -1,4 +1,5 @@
 import React from "react";
+import { PublicHeader, AvailableRentals } from "./PublicApplications.jsx";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -11,23 +12,17 @@ import {
   Check,
   MapPin,
 } from "lucide-react";
-export default function Home({ Logo, user, onSignIn, onDashboard }) {
+export default function Home({
+  Logo,
+  user,
+  onSignIn,
+  onDashboard,
+  onApply,
+  api,
+}) {
   return (
     <div className="public-home">
-      <nav className="home-nav">
-        <a href="/" aria-label="Arcland homepage">
-          <Logo />
-        </a>
-        <div className="home-nav-links">
-          <a href="#services">Our services</a>
-          <a href="#approach">Our approach</a>
-          <a href="#portals">Your portal</a>
-        </div>
-        <button className="primary" onClick={user ? onDashboard : onSignIn}>
-          {user ? "My dashboard" : "Sign in"}
-          <ArrowUpRight size={16} />
-        </button>
-      </nav>
+      <PublicHeader {...{ Logo, user, onSignIn, onDashboard, onApply }} />
       <section className="home-hero">
         <div className="hero-copy">
           <span className="home-eyebrow">
@@ -139,6 +134,7 @@ export default function Home({ Logo, user, onSignIn, onDashboard }) {
           ))}
         </div>
       </section>
+      <AvailableRentals api={api} onApply={onApply} />
       <section className="home-approach" id="approach">
         <div className="approach-art">
           <div className="arch-window">
@@ -216,6 +212,103 @@ export default function Home({ Logo, user, onSignIn, onDashboard }) {
                 Enter your portal <ArrowUpRight size={15} />
               </button>
             </article>
+          ))}
+        </div>
+      </section>
+      <section className="home-section home-steps">
+        <div className="home-section-head">
+          <div>
+            <span className="home-eyebrow">A CLEAR PATH FORWARD</span>
+            <h2>
+              From looking
+              <br />
+              to feeling at home.
+            </h2>
+          </div>
+          <button className="primary" onClick={() => onApply()}>
+            Start your application <ArrowUpRight size={16} />
+          </button>
+        </div>
+        <div className="home-step-grid">
+          {[
+            [
+              "01",
+              "Explore your options",
+              "Browse published rentals and consider what fits your next chapter.",
+            ],
+            [
+              "02",
+              "Make an introduction",
+              "Share your contact details and preferences through a preliminary application.",
+            ],
+            [
+              "03",
+              "Connect with our team",
+              "Discuss availability, arrange a viewing, and learn about next steps.",
+            ],
+            [
+              "04",
+              "Settle in, connected",
+              "Approved residents receive access to their own secure tenant dashboard.",
+            ],
+          ].map(([n, h, p]) => (
+            <article key={n}>
+              <span>{n}</span>
+              <h3>{h}</h3>
+              <p>{p}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="home-section home-faq" id="faq">
+        <div className="home-section-head">
+          <div>
+            <span className="home-eyebrow">A FEW HELPFUL ANSWERS</span>
+            <h2>
+              Good questions.
+              <br />
+              Clearer next steps.
+            </h2>
+          </div>
+          <p>
+            A little clarity before your next move. Our team can answer
+            property-specific questions during the leasing process.
+          </p>
+        </div>
+        <div className="faq-list">
+          {[
+            [
+              "How do I apply for a rental?",
+              "Open the Applications tab, select a published rental or a general application, and submit your contact details and preferences.",
+            ],
+            [
+              "Do I need an account to apply?",
+              "No. Prospective tenants can apply without an account. Approved residents receive an account from the property administrator.",
+            ],
+            [
+              "Does an application reserve a unit?",
+              "No. A preliminary application does not reserve a unit or create a lease. The leasing team will discuss availability and the next steps with you.",
+            ],
+            [
+              "How will I hear back?",
+              "The leasing team will contact you using the email address or phone number you provide. Save the confirmation reference shown after submission.",
+            ],
+            [
+              "What information should I provide?",
+              "Your name, contact details, preferred move-in date, household size, and rental preferences. Do not include identification numbers, bank details, or financial documents in the public form.",
+            ],
+            [
+              "How do existing tenants request maintenance?",
+              "Sign in to your tenant dashboard and submit a maintenance request. For an emergency, contact local emergency services; portal requests are not an emergency service.",
+            ],
+          ].map(([q, a]) => (
+            <details key={q}>
+              <summary>
+                {q}
+                <ChevronDown size={16} />
+              </summary>
+              <p>{a}</p>
+            </details>
           ))}
         </div>
       </section>

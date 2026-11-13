@@ -77,6 +77,10 @@ export async function openDatabase({
     `CREATE TABLE IF NOT EXISTS records (id TEXT PRIMARY KEY, module TEXT NOT NULL, data TEXT NOT NULL, status TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS records_module_idx ON records(module,archived)`,
     `CREATE TABLE IF NOT EXISTS audit (id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, action TEXT NOT NULL, module TEXT, record_id TEXT, detail TEXT NOT NULL, created_at TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS preferences (user_id TEXT NOT NULL REFERENCES users(id), module TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(user_id,module))`,
+    `CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, record_id TEXT NOT NULL REFERENCES records(id), author_id TEXT NOT NULL, author_name TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS comments_record_idx ON comments(record_id)`,
+    `CREATE INDEX IF NOT EXISTS audit_record_idx ON audit(record_id,module,created_at)`,
     `CREATE TABLE IF NOT EXISTS settings (id TEXT PRIMARY KEY, data TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS setup_lock (id TEXT PRIMARY KEY)`,
   ])
