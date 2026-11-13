@@ -358,6 +358,7 @@ export const modules = [
     fields: [
       name,
       prop,
+      ref("tenantId", "Resident access", "tenants"),
       choice("category", "Category", [
         "Lease",
         "Insurance",
@@ -424,6 +425,7 @@ export const modules = [
     fields: [
       name,
       prop,
+      ref("tenantId", "Resident access", "tenants"),
       date("eventDate", "Date", true),
       f("time", "Time", "time"),
       text("location", "Location"),

@@ -27,10 +27,18 @@ For development, run `npm start` for the API and `npm run dev` in a second termi
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `render.yaml` defines a web service and private PostgreSQL database in Virginia. This is a free evaluation preview: the database expires after 30 days and the web service can spin down when idle. Do not store live tenant records until durable hosting and backups are configured. Creating a Blueprint plan does not deploy it.
 
+## Homepage and sign-in
+
+`/` is the public company homepage. `/signin` is the one sign-in page for all roles. `/dashboard` renders the authenticated account’s administrator, agent, or tenant dashboard; users cannot select or override their role during sign-in. Activation links still use the private `/#activate=...` flow.
+
+In **Admin dashboard → Team & access**, create an agent and assign properties, or create a tenant account linked to an existing resident record. Accounts are not created from public sign-up. Each resident can have one tenant account. An unassigned agent has no property access. Documents need an explicit Resident access selection and Reviewed status; notices must be Delivered before tenant visibility. Appointment sharing requires explicit Resident access.
+
 ## Access and data
 
 - **Administrator**: all workflows, account management, settings, sample data, record backups, and payment reversals.
-- **Manager**: read/export data and create/edit/archive records.
+- **Agent**: an assigned-property dashboard, leasing and operational workflows scoped to assigned properties, and no company financial/account access.
+- **Tenant**: a personal dashboard for leases, invoices, recorded payments, explicitly shared documents/notices/appointments, and their own maintenance requests. Tenant ownership and unit links are assigned server-side.
+- **Manager (legacy)**: existing manager accounts retain their previous company-wide editing rights. Administrators should change them to Agent with explicit property assignments when appropriate.
 - **Viewer**: read data and export CSV. Server-side checks reject writes.
 - Passwords use salted scrypt. Sessions use hashed random tokens in the database, HttpOnly/SameSite cookies, and eight-hour expiration. Production cookies require HTTPS.
 - An owner can also be prepared through the setup-secret-protected activation endpoint. Its one-time activation link expires after 24 hours, stores only a token hash, and lets the owner choose a password privately. Pending accounts cannot sign in.
@@ -43,7 +51,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `render.yaml` defines a web servic
 
 This release is a management ledger, not a payment processor or certified accounting system. Posting an external payment recalculates its invoice balance and rejects overpayment. Administrators can reverse posted payments with a recorded reason. Paid invoices and posted payment details are locked. Lease activation rejects conflicting active leases and updates unit occupancy.
 
-Notices are prepared and delivery is recorded manually; no emails/SMS are sent. Documents are secure HTTPS links; uploads and virus scanning are not included. There is no public resident portal, e-signature provider, bank feed, payment gateway, tax filing, or automated screening. Accounts share a single company workspace. SSO, MFA, automatic password reset email, fine-grained property permissions, and multi-company tenancy are not included.
+Notices are prepared and delivery is recorded manually; no emails/SMS are sent. Documents are secure HTTPS links; uploads and virus scanning are not included. There is no public self-registration, e-signature provider, bank feed, payment gateway, tax filing, or automated screening. Accounts share a single company workspace. SSO, MFA, automatic password reset email, multi-company tenancy, and field-by-field permission configuration are not included.
 
 Calendar dates are stored as entered; appointment times use the configured company timezone. CSV values that can trigger spreadsheet formulas are prefixed to make exported text safe. JSON record exports exclude passwords/sessions but contain private business data and should be protected. They are not a database disaster-recovery system; configure provider backups separately.
 

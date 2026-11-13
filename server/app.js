@@ -19,6 +19,14 @@ import {
   getModule,
   decode,
 } from "./validation.js";
+import {
+  agentModules,
+  agentWrites,
+  profileOf,
+  scopedRecords,
+  validateProfile,
+  assertAgentAccess,
+} from "./access.js";
 const now = () => new Date().toISOString();
 const emailOk = (e) =>
   typeof e === "string" &&
@@ -194,14 +202,12 @@ export function createApp(
       );
       await audit(tx, u, "Prepared administrator activation");
     });
-    res
-      .status(201)
-      .json({
-        email: u.email,
-        name: u.name,
-        pendingActivation: true,
-        expiresAt,
-      });
+    res.status(201).json({
+      email: u.email,
+      name: u.name,
+      pendingActivation: true,
+      expiresAt,
+    });
   });
   async function activation(tx, value) {
     if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value))
@@ -274,10 +280,84 @@ export function createApp(
     next();
   };
   const write = (req, res, next) => {
-    if (!["admin", "manager"].includes(req.user.role))
+    if (!["admin", "manager", "agent"].includes(req.user.role))
       fail("This account has read-only access", 403);
     next();
   };
+  app.post("/api/tenant/requests", async (req, res) => {
+    if (req.user.role !== "tenant") fail("Tenant access required", 403);
+    const { title, description, priority } = req.body;
+    if (
+      typeof title !== "string" ||
+      !title.trim() ||
+      title.length > 150 ||
+      typeof description !== "string" ||
+      description.trim().length < 5 ||
+      description.length > 5000 ||
+      !["Low", "Normal", "High", "Urgent"].includes(priority)
+    )
+      fail("Enter a title, description, and priority");
+    const id = randomUUID(),
+      time = now();
+    await db.transaction(async (tx) => {
+      const [tenant] = await tx.query(
+        "SELECT * FROM records WHERE id=$1 AND module='tenants' AND archived=0",
+        [profileOf(req.user).tenantId || ""],
+      );
+      if (!tenant) fail("Your resident record is not active", 403);
+      const t = JSON.parse(tenant.data);
+      const [unit] = await tx.query(
+        "SELECT * FROM records WHERE id=$1 AND module='units' AND archived=0",
+        [t.unitId || ""],
+      );
+      if (!unit) fail("Contact your manager to link your current unit", 400);
+      const data = {
+        name: title.trim(),
+        propertyId: JSON.parse(unit.data).propertyId,
+        unitId: unit.id,
+        priority,
+        notes: description.trim(),
+        residentDescription: description.trim(),
+        requesterTenantId: tenant.id,
+      };
+      await tx.exec(
+        "INSERT INTO records (id,module,data,status,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6)",
+        [id, "maintenance", JSON.stringify(data), "Open", time, time],
+      );
+      await audit(
+        tx,
+        req.user,
+        "Submitted maintenance request",
+        "maintenance",
+        id,
+        title.trim(),
+      );
+    });
+    res.status(201).json({ id });
+  });
+  app.post("/api/tenant/requests/:id/cancel", async (req, res) => {
+    if (req.user.role !== "tenant") fail("Tenant access required", 403);
+    await db.transaction(async (tx) => {
+      const r = await read(tx, req.params.id, "maintenance");
+      const d = JSON.parse(r.data);
+      if (d.requesterTenantId !== profileOf(req.user).tenantId)
+        fail("Request not found", 404);
+      if (r.archived || r.status !== "Open")
+        fail("Only open requests can be cancelled", 409);
+      if (req.body.version !== r.version)
+        fail("Request changed. Refresh and try again.", 409);
+      await update(tx, r, d, "Cancelled");
+      await audit(
+        tx,
+        req.user,
+        "Cancelled maintenance request",
+        "maintenance",
+        r.id,
+        d.name,
+      );
+    });
+    res.json({ ok: true });
+  });
   app.get("/api/auth/me", (req, res) =>
     res.json({ user: publicUser(req.user) }),
   );
@@ -317,9 +397,26 @@ export function createApp(
       "company",
     ]);
     res.json({
-      modules,
-      features: featureCatalog,
-      records: rows.map(decode),
+      modules:
+        req.user.role === "agent"
+          ? modules.filter((m) => agentModules.includes(m.id))
+          : req.user.role === "tenant"
+            ? modules.filter((m) =>
+                [
+                  "leases",
+                  "invoices",
+                  "payments",
+                  "maintenance",
+                  "notices",
+                  "documents",
+                  "events",
+                ].includes(m.id),
+              )
+            : modules,
+      features: ["agent", "tenant"].includes(req.user.role)
+        ? []
+        : featureCatalog,
+      records: scopedRecords(req.user, rows.map(decode)),
       user: publicUser(req.user),
       settings: setting
         ? JSON.parse(setting.data)
@@ -426,6 +523,7 @@ export function createApp(
     const id = randomUUID(),
       time = now();
     await db.transaction(async (tx) => {
+      await assertAgentAccess(tx, req.user, m, data, id);
       await validateReferences(tx, m, data);
       await rules(tx, m, data, status, id);
       await tx.exec(
@@ -446,7 +544,16 @@ export function createApp(
         fail("This record changed. Refresh and try again.", 409);
       if (r.archived) fail("Restore this record before editing");
       const old = JSON.parse(r.data),
-        data = validate(m, req.body.data);
+        data = {
+          ...validate(m, req.body.data),
+          ...(old.requesterTenantId
+            ? {
+                requesterTenantId: old.requesterTenantId,
+                residentDescription: old.residentDescription,
+              }
+            : {}),
+        };
+      await assertAgentAccess(tx, req.user, m, old, id);
       const status = req.body.status || r.status;
       if (!m.statuses.includes(status)) fail("Invalid status");
       if (
@@ -470,6 +577,7 @@ export function createApp(
             "Cannot change invoice amount, resident, or void/draft status after payments are posted",
           );
       }
+      await assertAgentAccess(tx, req.user, m, data, id);
       await validateReferences(tx, m, data);
       await rules(tx, m, data, status, id);
       await update(tx, r, data, status);
@@ -488,6 +596,7 @@ export function createApp(
       if (req.body.version !== r.version)
         fail("This record changed. Refresh and try again.", 409);
       const data = JSON.parse(r.data);
+      await assertAgentAccess(tx, req.user, m, data, id);
       let status = r.status,
         archived = r.archived;
       if (operation === "archive") {
@@ -509,6 +618,7 @@ export function createApp(
       }
       if (operation === "restore") {
         if (!r.archived) fail("Record is not archived");
+        await assertAgentAccess(tx, req.user, m, data, id);
         await validateReferences(tx, m, data);
         await rules(tx, m, data, status, id);
         archived = 0;
@@ -517,6 +627,7 @@ export function createApp(
         if (r.archived) fail("Restore the record first");
         if (!m.action.from.includes(r.status))
           fail("This action is not available for the current status", 409);
+        await assertAgentAccess(tx, req.user, m, data, id);
         await validateReferences(tx, m, data);
         status = m.action.to;
         await rules(tx, m, data, status, id);
@@ -585,13 +696,17 @@ export function createApp(
     });
     res.json({ ok: true });
   });
-  app.get("/api/audit", async (req, res) =>
+  app.get("/api/audit", async (req, res) => {
+    if (req.user.role === "tenant") fail("Staff access required", 403);
     res.json({
       events: await db.query(
-        "SELECT * FROM audit ORDER BY created_at DESC LIMIT 1000",
+        req.user.role === "agent"
+          ? "SELECT * FROM audit WHERE actor_id=$1 ORDER BY created_at DESC LIMIT 1000"
+          : "SELECT * FROM audit ORDER BY created_at DESC LIMIT 1000",
+        req.user.role === "agent" ? [req.user.id] : [],
       ),
-    }),
-  );
+    });
+  });
   app.get("/api/users", admin, async (req, res) =>
     res.json({
       users: (await db.query("SELECT * FROM users ORDER BY created_at")).map(
@@ -607,15 +722,24 @@ export function createApp(
       name.length > 100 ||
       !emailOk(email) ||
       !passwordOk(password) ||
-      !["admin", "manager", "viewer"].includes(role)
+      !["admin", "agent", "tenant", "manager", "viewer"].includes(role)
     )
       fail("Enter valid account details; passwords need 12–128 characters");
     const id = randomUUID(),
       hash = await hashPassword(password);
     await db.transaction(async (tx) => {
+      const profile = await validateProfile(tx, role, req.body.profile, id);
       await tx.exec(
-        "INSERT INTO users (id,email,name,password_hash,role,created_at) VALUES ($1,$2,$3,$4,$5,$6)",
-        [id, email.toLowerCase().trim(), name.trim(), hash, role, now()],
+        "INSERT INTO users (id,email,name,password_hash,role,profile,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+        [
+          id,
+          email.toLowerCase().trim(),
+          name.trim(),
+          hash,
+          role,
+          JSON.stringify(profile),
+          now(),
+        ],
       );
       await audit(tx, req.user, "Created team account", null, id, email);
     });
@@ -626,7 +750,7 @@ export function createApp(
       fail("You cannot change your own role or disable your own account");
     const { role, disabled } = req.body;
     if (
-      !["admin", "manager", "viewer"].includes(role) ||
+      !["admin", "agent", "tenant", "manager", "viewer"].includes(role) ||
       typeof disabled !== "boolean"
     )
       fail("Invalid account settings");
@@ -642,11 +766,19 @@ export function createApp(
         if (Number(count.count) <= 1)
           fail("At least one active administrator must remain");
       }
-      await tx.exec("UPDATE users SET role=$1,disabled=$2 WHERE id=$3", [
-        role,
-        disabled ? 1 : 0,
-        req.params.id,
-      ]);
+      const profile =
+        disabled && role === u.role && req.body.profile === undefined
+          ? profileOf(u)
+          : await validateProfile(
+              tx,
+              role,
+              req.body.profile ?? profileOf(u),
+              u.id,
+            );
+      await tx.exec(
+        "UPDATE users SET role=$1,disabled=$2,profile=$3 WHERE id=$4",
+        [role, disabled ? 1 : 0, JSON.stringify(profile), u.id],
+      );
       await tx.exec("DELETE FROM sessions WHERE user_id=$1", [req.params.id]);
       await audit(
         tx,

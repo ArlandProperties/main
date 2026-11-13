@@ -112,6 +112,9 @@ const I = {
 };
 import { modules, moduleMap, featureCatalog } from "../shared/modules";
 import "./style.css";
+import HomePage from "./Home.jsx";
+import Portal from "./Portal.jsx";
+import "./portals.css";
 const Icon = ({ name, size = 18, ...props }) => {
   const C = I[name] || I.Circle;
   return <C size={size} strokeWidth={1.7} {...props} />;
@@ -178,6 +181,31 @@ function App() {
     [calendarMonth, setCalendarMonth] = useState(
       new Date().toISOString().slice(0, 7),
     );
+  const [route, setRoute] = useState(window.location.pathname);
+  const [authIntent, setAuthIntent] = useState(
+    window.location.hash.includes("activate="),
+  );
+  function navigate(path) {
+    window.history.pushState(null, "", path);
+    setRoute(path);
+    setAuthIntent(false);
+    window.scrollTo(0, 0);
+  }
+  useEffect(() => {
+    const pop = () => setRoute(window.location.pathname);
+    const hash = () => {
+      if (window.location.hash.includes("activate=")) setAuthIntent(true);
+    };
+    window.addEventListener("popstate", pop);
+    window.addEventListener("hashchange", hash);
+    return () => {
+      window.removeEventListener("popstate", pop);
+      window.removeEventListener("hashchange", hash);
+    };
+  }, []);
+  useEffect(() => {
+    if (user && ["/signin", "/login"].includes(route)) navigate("/dashboard");
+  }, [user, route]);
   const tell = (message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 5000);
@@ -337,14 +365,36 @@ function App() {
         <span>Opening your workspace…</span>
       </div>
     );
+  if (route === "/" && !authIntent)
+    return (
+      <HomePage
+        Logo={Logo}
+        user={user}
+        onSignIn={() => navigate("/signin")}
+        onDashboard={() => navigate("/dashboard")}
+      />
+    );
   if (!user)
     return (
       <Auth
         auth={auth}
         error={error}
+        onHome={() => navigate("/")}
         onLogin={async () => {
           await refresh();
+          navigate("/dashboard");
         }}
+      />
+    );
+  if (["agent", "tenant"].includes(user.role))
+    return (
+      <Portal
+        state={state}
+        api={api}
+        onRefresh={refresh}
+        onLogout={logout}
+        onHome={() => navigate("/")}
+        Logo={Logo}
       />
     );
   const units = of("units"),
@@ -373,7 +423,8 @@ function App() {
   const pageTitle =
     m?.label ||
     {
-      overview: "Portfolio overview",
+      overview:
+        user.role === "admin" ? "Admin dashboard" : "Portfolio overview",
       reports: "Portfolio insights",
       calendar: "Portfolio calendar",
       activity: "Activity log",
@@ -404,6 +455,10 @@ function App() {
       setUser(null);
       setState(null);
     }
+    setPage("overview");
+    setModal(null);
+    setError("");
+    navigate("/signin");
   }
   function stats() {
     return (
@@ -1090,24 +1145,21 @@ function App() {
                   </td>
                   <td>{u.email}</td>
                   <td>
-                    <select
-                      aria-label={`Role for ${u.name}`}
-                      value={u.role}
+                    <button
                       disabled={u.id === user.id || busy}
-                      onChange={async (e) => {
-                        await mutate(
-                          "/users/" + u.id,
-                          { role: e.target.value, disabled: u.disabled },
-                          "PATCH",
-                          "Access updated",
-                        );
-                        setTeam((await api("/users")).users);
-                      }}
+                      onClick={() => setModal({ type: "user", record: u })}
                     >
-                      {["admin", "manager", "viewer"].map((r) => (
-                        <option key={r}>{r}</option>
-                      ))}
-                    </select>
+                      {u.role === "manager"
+                        ? "Manager"
+                        : u.role === "viewer"
+                          ? "Viewer"
+                          : u.role === "admin"
+                            ? "Administrator"
+                            : u.role === "agent"
+                              ? "Agent"
+                              : "Tenant"}
+                      {u.id !== user.id && " · Manage"}
+                    </button>
                   </td>
                   <td>
                     <Badge value={u.disabled ? "Disabled" : "Active"} />
@@ -1449,6 +1501,19 @@ function App() {
           ))}
         </div>
         <div className="sidebar-bottom">
+          {isAdmin && (
+            <button
+              className={page === "team" ? "nav active" : "nav"}
+              onClick={() => go("team")}
+            >
+              <Icon name="Users" />
+              Team & access
+            </button>
+          )}
+          <button className="nav" onClick={() => navigate("/")}>
+            <Icon name="Building2" />
+            Public homepage
+          </button>
           <button
             className={page === "activity" ? "nav active" : "nav"}
             onClick={() => go("activity")}
@@ -1646,7 +1711,9 @@ function App() {
 function Logo() {
   return (
     <div className="brand">
-      <span className="logo-mark">A</span>
+      <span className="logo-mark">
+        <img src="/arcland-logo.png" alt="" />
+      </span>
       <div>
         <b>ARCLAND</b>
         <small>PROPERTIES INC</small>
@@ -1726,7 +1793,7 @@ function Nav({ p, l, i, page, go, count }) {
     </button>
   );
 }
-function Auth({ auth, onLogin, error: initialError }) {
+function Auth({ auth, onLogin, onHome, error: initialError }) {
   const [error, setError] = useState(initialError),
     [busy, setBusy] = useState(false);
   function readActivationToken() {
@@ -1803,6 +1870,11 @@ function Auth({ auth, onLogin, error: initialError }) {
       </div>
       <div className="auth-form-wrap">
         <div className="auth-form">
+          {onHome && (
+            <button className="auth-back" onClick={onHome}>
+              ← Back to homepage
+            </button>
+          )}
           <span className="auth-badge">
             <Icon name="ShieldCheck" size={15} />
             Your secure workspace
@@ -1819,7 +1891,7 @@ function Auth({ auth, onLogin, error: initialError }) {
               ? "Activate your administrator account with a password only you know."
               : setup
                 ? "Create the first administrator account to get started."
-                : "Sign in to keep your portfolio moving forward."}
+                : "One secure sign-in for administrators, agents, and tenants."}
           </p>
           {error && (
             <div className="error" role="alert">
@@ -1936,7 +2008,7 @@ function Auth({ auth, onLogin, error: initialError }) {
               ? "This private link works once and expires after 24 hours. Choose a password of at least 12 characters."
               : setup
                 ? "Only the first account can be created here. Administrators add team members inside the workspace."
-                : "Need access or a password reset? Contact your workspace administrator."}
+                : "Your account determines your dashboard. Need access? Contact your property administrator."}
           </p>
         </div>
         <small className="auth-bottom">
@@ -1966,6 +2038,7 @@ function Modal({
   refresh,
   setTeam,
 }) {
+  const [accountRole, setAccountRole] = useState(modal.record?.role || "agent");
   const [localError, setLocalError] = useState(""),
     [search, setSearch] = useState("");
   const close = () => setModal(null),
@@ -2212,49 +2285,143 @@ function Modal({
     );
   }
   if (modal.type === "user") {
-    title = "A stronger team starts here.";
+    title = record ? "Manage account access" : "Create a connected account";
     subtitle =
-      "Create an account and share its credentials securely outside this app.";
+      "Administrators oversee the company. Agents work on assigned properties. Tenants see their own records.";
     body = (
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          const fd = new FormData(e.target);
+          const profile =
+            accountRole === "tenant"
+              ? { tenantId: fd.get("tenantId") }
+              : accountRole === "agent"
+                ? { propertyIds: fd.getAll("propertyIds") }
+                : {};
+          const payload = record
+            ? { role: accountRole, disabled: record.disabled, profile }
+            : {
+                name: fd.get("name"),
+                email: fd.get("email"),
+                password: fd.get("password"),
+                role: accountRole,
+                profile,
+              };
           const r = await mutate(
-            "/users",
-            Object.fromEntries(new FormData(e.target)),
+            "/users" + (record ? "/" + record.id : ""),
+            payload,
+            record ? "PATCH" : "POST",
           );
           if (r) setTeam((await api("/users")).users);
         }}
       >
         <Field label="Full name">
-          <input name="name" required maxLength={100} />
-        </Field>
-        <Field label="Email">
-          <input name="email" type="email" required />
-        </Field>
-        <Field label="Initial password">
           <input
-            name="password"
-            type="password"
-            minLength={12}
-            maxLength={128}
+            name="name"
             required
-            autoComplete="new-password"
+            maxLength={100}
+            defaultValue={record?.name || ""}
+            readOnly={!!record}
           />
         </Field>
+        <Field label="Email">
+          <input
+            name="email"
+            type="email"
+            required
+            defaultValue={record?.email || ""}
+            readOnly={!!record}
+          />
+        </Field>
+        {!record && (
+          <Field label="Initial password">
+            <input
+              name="password"
+              type="password"
+              minLength={12}
+              maxLength={128}
+              required
+              autoComplete="new-password"
+            />
+          </Field>
+        )}
         <Field label="Role">
-          <select name="role">
-            <option value="manager">Manager — edit records</option>
-            <option value="viewer">Viewer — read and export</option>
+          <select
+            name="role"
+            aria-label="Role"
+            value={accountRole}
+            onChange={(e) => setAccountRole(e.target.value)}
+          >
+            <option value="agent">Agent — assigned properties</option>
+            <option value="tenant">Tenant — own resident records</option>
             <option value="admin">Administrator — full access</option>
+            <option value="viewer">Viewer — read and export</option>
+            {accountRole === "manager" && (
+              <option value="manager">Manager (existing account)</option>
+            )}
           </select>
         </Field>
+        {accountRole === "agent" && (
+          <>
+            <Field label="Assigned properties">
+              <select
+                name="propertyIds"
+                aria-label="Assigned properties"
+                multiple
+                size={5}
+                defaultValue={record?.profile?.propertyIds || []}
+              >
+                {records
+                  .filter((r) => r.module === "properties" && !r.archived)
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <p className="form-hint">
+              Use Ctrl or Command to select multiple properties. No selection
+              means no property access.
+            </p>
+          </>
+        )}
+        {accountRole === "tenant" && (
+          <>
+            <Field label="Linked resident">
+              <select
+                name="tenantId"
+                aria-label="Linked resident"
+                required
+                defaultValue={record?.profile?.tenantId || ""}
+              >
+                <option value="">Choose resident…</option>
+                {records
+                  .filter((r) => r.module === "tenants" && !r.archived)
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} · {r.email}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <p className="form-hint">
+              Create the resident record first. This account will see only that
+              resident’s records and requests.
+            </p>
+          </>
+        )}
+        <p className="form-hint">
+          All roles use the same sign-in page. Share initial credentials
+          privately; users can change their password in their dashboard.
+        </p>
         <div className="modal-actions">
           <button type="button" onClick={close}>
             Cancel
           </button>
           <button className="primary" disabled={busy}>
-            Create account
+            {record ? "Save access" : "Create account"}
           </button>
         </div>
       </form>

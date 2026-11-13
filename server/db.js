@@ -71,7 +71,7 @@ export async function openDatabase({
   };
   base.close = () => (pool ? pool.end() : enqueue(() => sqlite.close()));
   for (const sql of [
-    `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL, disabled INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL, disabled INTEGER NOT NULL DEFAULT 0, profile TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS activations (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS records (id TEXT PRIMARY KEY, module TEXT NOT NULL, data TEXT NOT NULL, status TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
@@ -81,6 +81,15 @@ export async function openDatabase({
     `CREATE TABLE IF NOT EXISTS setup_lock (id TEXT PRIMARY KEY)`,
   ])
     await base.exec(sql);
+  const columns = pool
+    ? await base.query(
+        "SELECT column_name AS name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='users'",
+      )
+    : await base.query("PRAGMA table_info(users)");
+  if (!columns.some((c) => c.name === "profile"))
+    await base.exec(
+      "ALTER TABLE users ADD COLUMN profile TEXT NOT NULL DEFAULT '{}'",
+    );
   await base.exec(
     "INSERT INTO setup_lock (id) VALUES ('owner') ON CONFLICT (id) DO NOTHING",
   );

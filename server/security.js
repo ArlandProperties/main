@@ -31,5 +31,6 @@ export function publicUser(u) {
     email: u.email,
     role: u.role,
     disabled: !!u.disabled,
+    profile: JSON.parse(u.profile || "{}"),
   };
 }

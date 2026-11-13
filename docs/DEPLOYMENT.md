@@ -37,7 +37,7 @@ The Blueprint generates `SETUP_TOKEN` only when missing. Rotating that existing 
 - JSON exports are record snapshots, not full database backups.
 - Password resets for team members are performed by an administrator in Team & access.
 - If the only administrator loses access, perform a controlled database-level password reset with your hosting administrator. There is no unauthenticated password reset endpoint.
-- Auto deployment is configured on commits. Failed health checks should prevent a bad release from replacing a healthy deployment; verify this behavior in your Render service settings.
+- Auto deployment is requested on commits, but requires a connected Git provider in Render. The current public-repository source did not auto-deploy during verification, so releases were triggered manually and their exact deployed commits checked. Connect the Git provider in Render to enable reliable automatic deploys. Health checks must pass before a replacement becomes live.
 - To roll back code, redeploy a previous successful commit in Render. Back up the database before schema changes. This initial schema uses additive table/index creation at startup.
 
 ## Existing application
