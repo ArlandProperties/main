@@ -2,7 +2,7 @@ services:
   - type: web
     name: arcland-properties
     runtime: node
-    plan: starter
+    plan: free
     region: virginia
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
@@ -21,7 +21,7 @@ services:
           property: connectionString
 databases:
   - name: arcland-postgres
-    plan: basic-256mb
+    plan: free
     region: virginia
     databaseName: arcland
     user: arcland

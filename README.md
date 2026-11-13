@@ -25,7 +25,7 @@ For development, run `npm start` for the API and `npm run dev` in a second termi
 
 ## Render deployment
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `render.yaml` defines a web service and private PostgreSQL database in Virginia. These use paid plans. Review the generated Render plan and current prices before applying. Creating a Blueprint plan does not deploy it.
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `render.yaml` defines a web service and private PostgreSQL database in Virginia. This is a free evaluation preview: the database expires after 30 days and the web service can spin down when idle. Do not store live tenant records until durable hosting and backups are configured. Creating a Blueprint plan does not deploy it.
 
 ## Access and data
 

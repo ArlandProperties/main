@@ -29,6 +29,6 @@ Run with `npm run test:browser` after `npx playwright install chromium`. To use 
 
 ## CI and deployment checks
 
-GitHub Actions runs the API suite against both SQLite and PostgreSQL 16, builds the application, and runs browser checks. The hosted PostgreSQL adapter is not claimed verified until that PostgreSQL CI job passes. Render deployment and live HTTPS checks must be verified after its reviewed infrastructure plan is approved and applied.
+GitHub Actions runs the API suite against both SQLite and PostgreSQL 16, builds the application, and runs browser checks. The PostgreSQL 16 CI job passed for application commit `0f81cd5`. Render deployment and live HTTPS checks must be verified after its reviewed infrastructure plan is approved and applied.
 
 The checks cover implemented behavior; they are not an independent security audit, accessibility certification, financial compliance review, or load test.
