@@ -156,6 +156,83 @@ export function createApp(
     });
     res.status(201).json({ user: await session(res, u) });
   });
+  app.post("/api/auth/prepare", authLimit, async (req, res) => {
+    const { email, name, activationToken, setupToken: provided } = req.body;
+    if (!checkSecret(provided, setupToken))
+      fail("The setup token is incorrect", 403);
+    if (
+      !emailOk(email) ||
+      typeof name !== "string" ||
+      !name.trim() ||
+      name.length > 100 ||
+      !/^[a-f0-9]{64}$/.test(activationToken || "")
+    )
+      fail("Valid account details and an activation token are required");
+    const u = {
+      id: randomUUID(),
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      role: "admin",
+      created_at: now(),
+    };
+    const passwordHash = await hashPassword(token());
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await db.transaction(async (tx) => {
+      await tx.exec("UPDATE setup_lock SET id=$1 WHERE id=$2", [
+        "owner",
+        "owner",
+      ]);
+      const [count] = await tx.query("SELECT COUNT(*) AS count FROM users");
+      if (Number(count.count)) fail("An owner account already exists", 409);
+      await tx.exec(
+        "INSERT INTO users (id,email,name,password_hash,role,disabled,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+        [u.id, u.email, u.name, passwordHash, u.role, 1, u.created_at],
+      );
+      await tx.exec(
+        "INSERT INTO activations (token_hash,user_id,expires_at) VALUES ($1,$2,$3)",
+        [hashToken(activationToken), u.id, expiresAt],
+      );
+      await audit(tx, u, "Prepared administrator activation");
+    });
+    res
+      .status(201)
+      .json({
+        email: u.email,
+        name: u.name,
+        pendingActivation: true,
+        expiresAt,
+      });
+  });
+  async function activation(tx, value) {
+    if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value))
+      fail("Activation link is invalid or expired", 400);
+    const [u] = await tx.query(
+      "SELECT u.* FROM users u JOIN activations a ON a.user_id=u.id WHERE a.token_hash=$1 AND a.expires_at>$2 AND u.disabled=1",
+      [hashToken(value), now()],
+    );
+    if (!u) fail("Activation link is invalid, expired, or already used", 400);
+    return u;
+  }
+  app.post("/api/auth/activation-info", authLimit, async (req, res) => {
+    const u = await activation(db, req.body.activationToken);
+    res.json({ name: u.name, email: u.email });
+  });
+  app.post("/api/auth/activate", authLimit, async (req, res) => {
+    if (!passwordOk(req.body.password))
+      fail("Choose a password of 12–128 characters");
+    const passwordHash = await hashPassword(req.body.password);
+    const u = await db.transaction(async (tx) => {
+      const user = await activation(tx, req.body.activationToken);
+      await tx.exec(
+        "UPDATE users SET password_hash=$1,disabled=0 WHERE id=$2",
+        [passwordHash, user.id],
+      );
+      await tx.exec("DELETE FROM activations WHERE user_id=$1", [user.id]);
+      await audit(tx, user, "Activated administrator account");
+      return { ...user, disabled: 0 };
+    });
+    res.json({ user: await session(res, u) });
+  });
   app.post("/api/auth/login", authLimit, async (req, res) => {
     const { email, password } = req.body;
     if (
@@ -650,16 +727,14 @@ export function createApp(
         ? 409
         : 500);
     if (status >= 500) console.error("Request failed:", err.message);
-    res
-      .status(status)
-      .json({
-        error:
-          status === 409 && !err.status
-            ? "An account with that email already exists"
-            : status >= 500
-              ? "Something went wrong. Please try again."
-              : err.message,
-      });
+    res.status(status).json({
+      error:
+        status === 409 && !err.status
+          ? "An account with that email already exists"
+          : status >= 500
+            ? "Something went wrong. Please try again."
+            : err.message,
+    });
   });
   return app;
 }

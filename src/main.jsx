@@ -1729,7 +1729,42 @@ function Nav({ p, l, i, page, go, count }) {
 function Auth({ auth, onLogin, error: initialError }) {
   const [error, setError] = useState(initialError),
     [busy, setBusy] = useState(false);
-  const setup = auth?.needsSetup;
+  function readActivationToken() {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const value = params.get("activate");
+    if (value)
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    return value;
+  }
+  const [activationToken, setActivationToken] = useState(readActivationToken);
+  const [activationInfo, setActivationInfo] = useState(null);
+  useEffect(() => {
+    function consumeLink() {
+      const value = readActivationToken();
+      if (value) {
+        setActivationToken(value);
+        setActivationInfo(null);
+        setError("");
+      }
+    }
+    window.addEventListener("hashchange", consumeLink);
+    return () => window.removeEventListener("hashchange", consumeLink);
+  }, []);
+  useEffect(() => {
+    if (!activationToken) return;
+    api("/auth/activation-info", {
+      method: "POST",
+      body: JSON.stringify({ activationToken }),
+    })
+      .then(setActivationInfo)
+      .catch((e) => setError(e.message));
+  }, [activationToken]);
+  const activating = !!activationToken;
+  const setup = !activating && auth?.needsSetup;
   return (
     <div className="auth-layout">
       <div className="auth-story">
@@ -1772,18 +1807,32 @@ function Auth({ auth, onLogin, error: initialError }) {
             <Icon name="ShieldCheck" size={15} />
             Your secure workspace
           </span>
-          <h2>{setup ? "Build your foundation." : "Welcome back."}</h2>
+          <h2>
+            {activating
+              ? "Set your password."
+              : setup
+                ? "Build your foundation."
+                : "Welcome back."}
+          </h2>
           <p>
-            {setup
-              ? "Create the first administrator account to get started."
-              : "Sign in to keep your portfolio moving forward."}
+            {activating
+              ? "Activate your administrator account with a password only you know."
+              : setup
+                ? "Create the first administrator account to get started."
+                : "Sign in to keep your portfolio moving forward."}
           </p>
           {error && (
             <div className="error" role="alert">
               {error}
             </div>
           )}
-          {!auth ? (
+          {activating && !activationInfo ? (
+            <p>
+              {error
+                ? "Request a new activation link from your workspace administrator."
+                : "Checking your activation link…"}
+            </p>
+          ) : !auth ? (
             <p>Unable to reach the server. Refresh to try again.</p>
           ) : setup && !auth.setupEnabled ? (
             <div className="error">
@@ -1798,12 +1847,20 @@ function Auth({ auth, onLogin, error: initialError }) {
                 setError("");
                 try {
                   await onLogin(
-                    await api(setup ? "/auth/setup" : "/auth/login", {
-                      method: "POST",
-                      body: JSON.stringify(
-                        Object.fromEntries(new FormData(e.target)),
-                      ),
-                    }),
+                    await api(
+                      activating
+                        ? "/auth/activate"
+                        : setup
+                          ? "/auth/setup"
+                          : "/auth/login",
+                      {
+                        method: "POST",
+                        body: JSON.stringify({
+                          ...Object.fromEntries(new FormData(e.target)),
+                          ...(activating ? { activationToken } : {}),
+                        }),
+                      },
+                    ),
                   );
                 } catch (e) {
                   setError(e.message);
@@ -1839,6 +1896,8 @@ function Auth({ auth, onLogin, error: initialError }) {
                   name="email"
                   type="email"
                   required
+                  readOnly={activating}
+                  defaultValue={activationInfo?.email || ""}
                   autoComplete="email"
                   placeholder="you@company.com"
                 />
@@ -1848,24 +1907,36 @@ function Auth({ auth, onLogin, error: initialError }) {
                   name="password"
                   type="password"
                   required
-                  minLength={setup ? 12 : 1}
+                  minLength={setup || activating ? 12 : 1}
                   maxLength={128}
-                  autoComplete={setup ? "new-password" : "current-password"}
+                  autoComplete={
+                    setup || activating ? "new-password" : "current-password"
+                  }
                   placeholder={
-                    setup ? "At least 12 characters" : "Enter your password"
+                    setup || activating
+                      ? "At least 12 characters"
+                      : "Enter your password"
                   }
                 />
               </Field>
               <button className="primary auth-submit" disabled={busy}>
-                {busy ? "Please wait…" : setup ? "Create workspace" : "Sign in"}
+                {busy
+                  ? "Please wait…"
+                  : activating
+                    ? "Activate account"
+                    : setup
+                      ? "Create workspace"
+                      : "Sign in"}
                 <Icon name="ArrowRight" size={17} />
               </button>
             </form>
           )}
           <p className="auth-foot">
-            {setup
-              ? "Only the first account can be created here. Administrators add team members inside the workspace."
-              : "Need access or a password reset? Contact your workspace administrator."}
+            {activating
+              ? "This private link works once and expires after 24 hours. Choose a password of at least 12 characters."
+              : setup
+                ? "Only the first account can be created here. Administrators add team members inside the workspace."
+                : "Need access or a password reset? Contact your workspace administrator."}
           </p>
         </div>
         <small className="auth-bottom">

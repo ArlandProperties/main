@@ -29,14 +29,33 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(base);
   await page.getByRole("heading", { name: "Build your foundation." }).waitFor();
-  await page.getByLabel("Your name").fill("Arcland Admin");
-  await page.getByLabel("Setup token").fill("local-browser-qa-token");
-  await page.getByLabel("Email address").fill("qa@example.com");
+  const activationToken = "a".repeat(64);
+  const prepare = await fetch(base + "/api/auth/prepare", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Arcland-Request": "1" },
+    body: JSON.stringify({
+      setupToken: "local-browser-qa-token",
+      activationToken,
+      email: "qa@example.com",
+      name: "Arcland Admin",
+    }),
+  });
+  assert.equal(prepare.status, 201);
+  await page.goto(base + "/#activate=" + activationToken);
+  await page.getByRole("heading", { name: "Set your password." }).waitFor();
+  await page
+    .getByRole("button", { name: "Activate account", exact: true })
+    .waitFor();
+  assert.equal(
+    await page.getByLabel("Email address").inputValue(),
+    "qa@example.com",
+  );
+  assert.equal(await page.evaluate(() => window.location.hash), "");
   await page
     .getByLabel("Password", { exact: true })
     .fill("qa-local-password-123");
   await page
-    .getByRole("button", { name: "Create workspace", exact: true })
+    .getByRole("button", { name: "Activate account", exact: true })
     .click();
   await page
     .getByRole("heading", { name: "Portfolio overview", exact: true })
@@ -177,7 +196,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "Browser checks passed: setup, sample data, 20 module views/search/filter/sort/export/archive, task create/edit/action/archive/restore, 200 feature entries, calendar, mobile navigation and overflow.",
+    "Browser checks passed: private one-time activation, sample data, 20 module views/search/filter/sort/export/archive, task create/edit/action/archive/restore, 200 feature entries, calendar, mobile navigation and overflow.",
   );
 } finally {
   await browser?.close();

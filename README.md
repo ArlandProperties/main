@@ -33,6 +33,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `render.yaml` defines a web servic
 - **Manager**: read/export data and create/edit/archive records.
 - **Viewer**: read data and export CSV. Server-side checks reject writes.
 - Passwords use salted scrypt. Sessions use hashed random tokens in the database, HttpOnly/SameSite cookies, and eight-hour expiration. Production cookies require HTTPS.
+- An owner can also be prepared through the setup-secret-protected activation endpoint. Its one-time activation link expires after 24 hours, stores only a token hash, and lets the owner choose a password privately. Pending accounts cannot sign in.
 - Mutations require a custom header and same-origin requests. Login/setup are rate limited. A setup token protects first-owner creation.
 - Changes and audit entries are transactional. Record versions prevent stale overwrites. PostgreSQL advisory locking serializes mutations to preserve linked financial/occupancy rules.
 - PostgreSQL persists data across web service restarts. SQLite files are for local use only.

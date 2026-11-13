@@ -3,9 +3,9 @@
 ## Local checks
 
 - Production Vite build passes.
-- 33 API tests pass using a temporary SQLite database.
+- 35 API tests pass using a temporary SQLite database.
 - All 20 modules: create, read, edit, archive, restore, domain action, and persistence through authenticated requests.
-- Owner setup, secret validation, session authentication, CSRF header/origin checks, viewer permissions, account disablement, administrator password reset, password rotation, logout, and duplicate account checks.
+- One-time and expired activation links, disabled pending accounts, owner setup, secret validation, session authentication, CSRF header/origin checks, viewer permissions, account disablement, administrator password reset, password rotation, logout, and duplicate account checks.
 - Reference validation, linked-record archive guards, HTTPS-only document links, date validation, and optimistic concurrency.
 - Lease conflict prevention and unit occupancy updates.
 - Payment settlement, overpayment rejection, immutable posted records, derived paid status, and audited reversal with invoice recalculation.
@@ -16,7 +16,7 @@
 
 Desktop Chromium at 1440×1100 and mobile viewport at 390×844:
 
-- First administrator setup and authenticated navigation.
+- First administrator setup screen, private one-time activation, prefilled owner email, fragment removal, and authenticated navigation.
 - Loading the optional sample portfolio.
 - All 20 module screens, empty search, status filter, sorting, CSV downloads, archived view.
 - Task creation, details, domain action, editing, archive confirmation, and restore.

@@ -25,6 +25,12 @@ This configuration is an evaluation preview. Render free PostgreSQL databases ex
 6. Add team members inside **Team & access**. Share initial passwords privately.
 7. Optional: load fictional records using **Settings → Load sample portfolio**, before adding real records.
 
+## Prepared owner activation
+
+For assisted setup, `/api/auth/prepare` accepts the existing setup secret, an owner name/email, and a cryptographically random 32-byte hex activation token. It creates only the first owner, disabled until activation. The database stores the token hash with a 24-hour expiry. The private URL uses `/#activate=<token>`; fragments are not sent to the server and the app clears it from browser history. The owner chooses a password, `/api/auth/activate` enables the account, and the token is deleted transactionally. Reuse and expired links are rejected. Never commit or log the actual activation link. No activation email is sent.
+
+The Blueprint generates `SETUP_TOKEN` only when missing. Rotating that existing secret through Render with a merge preserves other environment values and later Blueprint syncs retain the rotated value. A deployment must occur before the new value is active.
+
 ## Operations
 
 - Enable PostgreSQL backups and test recovery according to your Render plan.
