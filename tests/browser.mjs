@@ -32,6 +32,61 @@ try {
     .getByRole("heading", { name: "Better properties. Better possibilities." })
     .waitFor();
   await page.screenshot({ path: "test-results/homepage.png", fullPage: true });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForFunction(
+    () => document.querySelector(".hero-photo-frame img")?.naturalWidth > 1000,
+  );
+  assert.equal(
+    await page
+      .locator(".hero-photo-frame img")
+      .evaluate((e) => getComputedStyle(e).filter),
+    "none",
+  );
+  await page
+    .getByRole("button", { name: "View clear property photo", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await page.getByText("125%", { exact: true }).waitFor();
+  await page
+    .getByRole("button", { name: "Close photo viewer", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Work & unwind", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Find my vibe", exact: true }).click();
+  await page
+    .getByRole("heading", { name: "Work & unwind", exact: true })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Try another vibe", exact: true })
+    .click();
+  await page.getByLabel("Monthly rent", { exact: true }).fill("2500");
+  assert.match(
+    await page.locator(".cost-results b").first().innerText(),
+    /2,750/,
+  );
+  await page.getByLabel("Monthly rent", { exact: true }).fill("2000");
+  for (const task of [
+    "Choose your target move date",
+    "Review the lease details",
+    "Plan utilities and internet",
+    "Measure your furniture",
+    "Arrange your moving day",
+    "Confirm your key collection",
+  ])
+    await page.getByLabel(task, { exact: true }).check();
+  await page
+    .getByText("Look at you, making moves!", { exact: false })
+    .waitFor();
+  await page
+    .getByRole("button", { name: "Reset my checklist", exact: true })
+    .click();
+  await page.screenshot({
+    path: "test-results/homepage-first-screen.png",
+    fullPage: false,
+  });
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("heading", { name: "Build your foundation." }).waitFor();
   const activationToken = "a".repeat(64);
@@ -76,6 +131,27 @@ try {
     .getByRole("button", { name: "Load sample data", exact: true })
     .click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
+  await page.evaluate(async () => {
+    const d = await (await fetch("/api/bootstrap")).json();
+    for (const unit of d.records
+      .filter((r) => r.module === "units" && r.status === "Vacant")
+      .slice(0, 2)) {
+      const r = await fetch("/api/records/units/" + unit.id, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Arcland-Request": "1",
+        },
+        body: JSON.stringify({
+          data: { ...unit, listing: "Public" },
+          status: unit.status,
+          version: unit.version,
+        }),
+      });
+      if (!r.ok) throw new Error("Failed to publish test rental");
+    }
+  });
+
   await page.getByRole("button", { name: "Overview", exact: true }).click();
   await page
     .getByText("The Willow Residences", { exact: true })
@@ -177,6 +253,61 @@ try {
     .getByRole("button", { name: "Browser verified task", exact: true })
     .click();
   await page
+    .getByRole("button", { name: "Record workspace", exact: true })
+    .click();
+  await page
+    .getByLabel("New record tag", { exact: true })
+    .fill("browser-review");
+  await page.getByRole("button", { name: "Add tag", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Follow record", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Pin for staff", exact: true })
+    .click();
+  await page.getByLabel("Follow-up date", { exact: true }).fill("2027-01-20");
+  await page.getByRole("button", { name: "Set date", exact: true }).click();
+  await page
+    .getByLabel("Follow-up priority", { exact: true })
+    .selectOption("High");
+  await page.getByRole("button", { name: "Review", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Request review", exact: true })
+    .click();
+  await page
+    .getByLabel("Review reason", { exact: true })
+    .fill("Ready for browser review");
+  await page
+    .getByRole("button", { name: "Save review notes", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Approve review", exact: true })
+    .click();
+  await page
+    .locator(".hub-review-state")
+    .getByText("Approved", { exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "Checklist", exact: true }).click();
+  await page
+    .getByLabel("New checklist item", { exact: true })
+    .fill("Browser verified step");
+  await page
+    .getByRole("button", { name: "Add checklist item", exact: true })
+    .click();
+  await page
+    .getByLabel("Complete Browser verified step", { exact: true })
+    .check();
+  await page.getByText("1 of 1 complete", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Completeness", exact: true }).click();
+  await page.getByText("Required fields complete", { exact: true }).waitFor();
+  const [brief] = await Promise.all([
+    page.waitForEvent("download"),
+    page
+      .getByRole("button", { name: "Download internal brief", exact: true })
+      .click(),
+  ]);
+  assert.equal(brief.suggestedFilename(), "arcland-record-brief.txt");
+  await page
     .getByLabel("Internal comment", { exact: true })
     .fill("Browser comment for this task.");
   await page.getByRole("button", { name: "Add comment", exact: true }).click();
@@ -224,6 +355,24 @@ try {
     .click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Archived", exact: true }).click();
+  await page
+    .getByLabel("Filter record tags", { exact: true })
+    .selectOption("browser-review");
+  assert.equal(await page.locator("tbody tr").count(), 1);
+  await page.getByLabel("Filter record tags", { exact: true }).selectOption("");
+  await page.getByRole("button", { name: "Following", exact: true }).click();
+  assert.equal(await page.locator("tbody tr").count(), 1);
+  await page.getByRole("button", { name: "Following", exact: true }).click();
+  await page
+    .getByRole("button", { name: "View followed record updates", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Mark all updates read", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "You’re all caught up.", exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await page.getByLabel("Select Browser updated task", { exact: true }).check();
   await page
     .getByRole("button", { name: "Duplicate selected", exact: true })
@@ -251,9 +400,9 @@ try {
     .getByRole("button", { name: "Settings & help", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Explore 500 capabilities", exact: true })
+    .getByRole("button", { name: "Explore 1200 capabilities", exact: true })
     .click();
-  assert.equal(await page.locator(".feature-grid li").count(), 500);
+  assert.equal(await page.locator(".feature-grid li").count(), 1200);
   await page.getByRole("button", { name: "Calendar", exact: true }).click();
   await page.locator(".calendar-day").first().waitFor();
   await page.getByLabel("Calendar month").fill("2026-12");
@@ -439,6 +588,25 @@ try {
     ),
     false,
   );
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.waitForTimeout(300);
+  const saveRental = page
+    .getByRole("button", { name: /^Save rental / })
+    .first();
+  await saveRental.click();
+  assert.equal(await saveRental.getAttribute("aria-pressed"), "true");
+  const compareBoxes = page.getByRole("checkbox", { name: /^Compare / });
+  await compareBoxes.nth(0).check();
+  await compareBoxes.nth(1).check();
+  await page
+    .getByRole("button", { name: "Compare my picks", exact: true })
+    .click();
+  assert.equal(await page.locator(".comparison-grid article").count(), 2);
+  await page
+    .getByRole("button", { name: "Close rental comparison", exact: true })
+    .click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Applications", exact: true }).click();
   await page
     .getByRole("heading", { name: "Make an introduction.", exact: true })
@@ -473,7 +641,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "Browser checks passed: private one-time activation, sample data, 20 module views/search/filter/sort/export/archive, task create/edit/action/archive/restore, 500 feature entries, calendar, account assignment, unified sign-in, agent and tenant dashboards, tenant requests, mobile navigation and overflow.",
+    "Browser checks passed: clear photo/zoom, vibe quiz, moving planner/checklist, rental favourites/comparison, record-workspace tags/follow-ups/reviews/checklists/briefs/updates, private one-time activation, sample data, 20 module views/search/filter/sort/export/archive, task create/edit/action/archive/restore, 1200 feature entries, calendar, account assignment, unified sign-in, agent and tenant dashboards, tenant requests, mobile navigation and overflow.",
   );
 } finally {
   await browser?.close();

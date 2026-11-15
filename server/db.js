@@ -81,6 +81,8 @@ export async function openDatabase({
     `CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, record_id TEXT NOT NULL REFERENCES records(id), author_id TEXT NOT NULL, author_name TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS comments_record_idx ON comments(record_id)`,
     `CREATE INDEX IF NOT EXISTS audit_record_idx ON audit(record_id,module,created_at)`,
+    `CREATE TABLE IF NOT EXISTS record_hubs (record_id TEXT PRIMARY KEY REFERENCES records(id), data TEXT NOT NULL, version INTEGER NOT NULL, updated_at TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS record_follows (user_id TEXT NOT NULL REFERENCES users(id), record_id TEXT NOT NULL REFERENCES records(id), read_at TEXT NOT NULL, PRIMARY KEY(user_id,record_id))`,
     `CREATE TABLE IF NOT EXISTS settings (id TEXT PRIMARY KEY, data TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS setup_lock (id TEXT PRIMARY KEY)`,
   ])

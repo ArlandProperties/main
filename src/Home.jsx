@@ -1,4 +1,5 @@
 import React from "react";
+import { HeroExperience, HomePlayground } from "./HomeFun.jsx";
 import { PublicHeader, AvailableRentals } from "./PublicApplications.jsx";
 import {
   ArrowUpRight,
@@ -39,8 +40,8 @@ export default function Home({
             agents, and residents feel at home with what comes next.
           </p>
           <div className="hero-actions">
-            <a className="home-button" href="#services">
-              Discover our approach <ArrowUpRight size={17} />
+            <a className="home-button" href="#home-vibe">
+              Find your home vibe <ArrowUpRight size={17} />
             </a>
             <button className="home-text-button" onClick={onSignIn}>
               Access your portal <ArrowRight size={16} />
@@ -57,29 +58,7 @@ export default function Home({
             </span>
           </div>
         </div>
-        <div className="hero-image">
-          <img
-            src="/home-hero.jpg"
-            alt="Contemporary residential property framed by landscaped gardens"
-          />
-          <div className="hero-caption">
-            <span className="caption-icon">
-              <Building2 size={24} />
-            </span>
-            <div>
-              <small>A PLACE FOR EVERY POSSIBILITY</small>
-              <b>
-                Properties cared for.
-                <br />
-                People looked after.
-              </b>
-            </div>
-          </div>
-          <div className="image-label">
-            <span />
-            THE ARCLAND APPROACH
-          </div>
-        </div>
+        <HeroExperience />
       </section>
       <div className="home-strip">
         <span>Property management, with perspective.</span>
@@ -135,6 +114,7 @@ export default function Home({
         </div>
       </section>
       <AvailableRentals api={api} onApply={onApply} />
+      <HomePlayground api={api} onApply={onApply} />
       <section className="home-approach" id="approach">
         <div className="approach-art">
           <div className="arch-window">

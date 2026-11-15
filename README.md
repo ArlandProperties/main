@@ -29,9 +29,19 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `render.yaml` defines a web servic
 
 ## Additional 300 module workflows
 
-The app now adds 15 shared workflows independently to each of the 20 staff modules: configurable columns, table density, page size, field filters, creation-date range, numeric range, multi-selection, bulk archive, bulk restore, bulk status changes, duplication, named saved views, bookmarks, internal comments, and record history. This is **300 additional module-level capabilities**, not 300 unrelated products or integrations. See [docs/ADDITIONAL-FEATURES.md](docs/ADDITIONAL-FEATURES.md). The feature directory lists the original 200 plus these 300, for 500 total. Permissions and financial/relationship locks still apply.
+The app now adds 15 shared workflows independently to each of the 20 staff modules: configurable columns, table density, page size, field filters, creation-date range, numeric range, multi-selection, bulk archive, bulk restore, bulk status changes, duplication, named saved views, bookmarks, internal comments, and record history. This is **300 additional module-level capabilities**, not 300 unrelated products or integrations. See [docs/ADDITIONAL-FEATURES.md](docs/ADDITIONAL-FEATURES.md). These extend the original 200 workflows; the newer record-workspace expansion adds a further 700, for 1,200 total. Permissions and financial/relationship locks still apply.
 
 Saved views and bookmarks are private per account and stored on the server. Bulk operations handle up to 100 records atomically and require confirmation. Internal comments are for company staff; they are not sent to residents or delivered as notifications.
+
+## 700 more record-workspace capabilities
+
+The latest expansion adds 35 record-workspace workflows independently in each of the 20 staff modules: tags, follow-up dates/priorities/owners, review decisions and notes, checklists, related/inbound links, personal follows and in-app unread updates, shared staff pins, completeness checks, and downloadable internal briefs. That is **700 additional module-level capabilities**, bringing the documented total to **1,200**. See [docs/RECORD-WORKSPACE-FEATURES.md](docs/RECORD-WORKSPACE-FEATURES.md). This is an explicit workflow count, not 700 unrelated integrations. Tenant/agent boundaries remain enforced; company record-workspace tools are available to administrators/managers and read-only viewers as appropriate.
+
+Workspace edits use version checks and transactions. Follows and read markers are private per account. Pins, tags, reviews, and checklists are shared company data. Reviews/checklists do not alter leases, invoice states, or legal approval status. Completeness checks are not safety inspections or compliance decisions. In-app updates do not send emails.
+
+## More interactive public experience
+
+The homepage uses a new sharp, unobstructed architectural image with a full-size zoom viewer. The image is illustrative, not a claim about an owned or listed property. A three-step home-vibe quiz, moving-cost planner, saved moving checklist, and rental shortlist/compare tools make discovery more engaging. Published rentals remain opt-in; favourites compare only currently published rental data. Quiz preferences are suggestions, not rental eligibility decisions. Planner values stay in the browser; favourites/checklist state is saved locally. Animation respects reduced-motion preferences.
 
 ## Public applications and rentals
 

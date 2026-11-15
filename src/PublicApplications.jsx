@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { RentalCompare } from "./HomeFun.jsx";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -163,6 +164,13 @@ export function AvailableRentals({ api, onApply }) {
             <ArrowRight size={15} />
           </button>
         </div>
+      )}
+      {data && (
+        <RentalCompare
+          rentals={data.rentals}
+          currency={data.currency}
+          onApply={onApply}
+        />
       )}
     </section>
   );

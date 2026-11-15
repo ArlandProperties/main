@@ -115,14 +115,26 @@ import {
   moduleMap,
   featureCatalog as baseFeatureCatalog,
   expandedFeatureCatalog,
+  recordHubFeatureCatalog,
 } from "../shared/modules";
-const featureCatalog = [...baseFeatureCatalog, ...expandedFeatureCatalog];
+const featureCatalog = [
+  ...baseFeatureCatalog,
+  ...expandedFeatureCatalog,
+  ...recordHubFeatureCatalog,
+];
 import {
   useModulePreferences,
   AdvancedModuleBar,
   RecordCollaboration,
   defaultView,
 } from "./ModuleTools.jsx";
+import {
+  useModuleHub,
+  ModuleHubBar,
+  RecordHub,
+  FollowedUpdates,
+  emptyHubFilters,
+} from "./RecordHub.jsx";
 import "./style.css";
 import HomePage from "./Home.jsx";
 import PublicApplications from "./PublicApplications.jsx";
@@ -329,6 +341,19 @@ function App() {
   useEffect(() => {
     setSelected([]);
   }, [archive, query, status, state?.records]);
+  const [hubFilters, setHubFilters] = useState({ ...emptyHubFilters });
+  const [hubRevision, setHubRevision] = useState(0);
+  const hubIndex = useModuleHub(api, m?.id, hubRevision, user?.id);
+  useEffect(() => {
+    setHubFilters({ ...emptyHubFilters });
+  }, [page]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  useEffect(() => {
+    if (!user || !["admin", "manager", "viewer"].includes(user.role)) return;
+    api("/hub/updates")
+      .then((d) => setUnreadCount(d.updates.length))
+      .catch(() => {});
+  }, [user?.id, hubRevision, modal?.type]);
   function exportRecords(module, rows) {
     const cols = [
       "name",
@@ -393,6 +418,24 @@ function App() {
           !(prefs.bookmarks || []).includes(r.id)
         )
           return false;
+        const workspace = hubIndex.records.find((x) => x.id === r.id);
+        if (hubFilters.tag && !workspace?.tags?.includes(hubFilters.tag))
+          return false;
+        if (
+          hubFilters.review &&
+          (workspace?.review?.status || "Not requested") !== hubFilters.review
+        )
+          return false;
+        if (
+          hubFilters.overdue &&
+          (!workspace?.followUp?.date ||
+            workspace.followUp.date >= new Date().toISOString().slice(0, 10))
+        )
+          return false;
+        if (hubFilters.hasLinks && !workspace?.links?.length) return false;
+        if (hubFilters.following && !hubIndex.followed.includes(r.id))
+          return false;
+        if (hubFilters.pinned && !workspace?.pinned) return false;
         const numeric = Number(r[advancedView.numeric]);
         if (
           advancedView.min !== "" &&
@@ -425,6 +468,8 @@ function App() {
     direction,
     advancedView,
     prefs.bookmarks,
+    hubFilters,
+    hubIndex,
   ]);
   if (!ready)
     return (
@@ -526,7 +571,7 @@ function App() {
       team: "Give the right people the right access.",
       settings: "Make this workspace feel like your business.",
       features:
-        "Explore the 500 module capabilities available in your workspace.",
+        "Explore the 1200 module capabilities available in your workspace.",
     }[page];
   async function logout() {
     try {
@@ -842,7 +887,8 @@ function App() {
       advancedView.to ||
       advancedView.min !== "" ||
       advancedView.max !== "" ||
-      advancedView.bookmarksOnly;
+      advancedView.bookmarksOnly ||
+      Object.values(hubFilters).some(Boolean);
     const defaultColumns = m.fields
       .filter((f) => f.key !== "name" && f.type !== "textarea")
       .slice(0, 3)
@@ -860,6 +906,19 @@ function App() {
           "panel records " + (prefs.density === "compact" ? "dense" : "")
         }
       >
+        <ModuleHubBar
+          api={api}
+          module={m.id}
+          data={hubIndex}
+          filters={hubFilters}
+          setFilters={(v) => {
+            setHubFilters(v);
+            setSelected([]);
+            setPageNum(1);
+          }}
+          canEdit={canEdit}
+          onRefresh={() => setHubRevision((n) => n + 1)}
+        />
         <AdvancedModuleBar
           m={m}
           records={records}
@@ -1536,7 +1595,7 @@ function App() {
             </p>
             <button onClick={() => go("features")}>
               <Icon name="Grid2X2" />
-              Explore 500 capabilities
+              Explore 1200 capabilities
             </button>
           </div>
         </section>
@@ -1549,7 +1608,7 @@ function App() {
         <div className="feature-banner">
           <Icon name="Blocks" size={30} />
           <div>
-            <h2>20 modules. 500 documented capabilities.</h2>
+            <h2>20 modules. 1200 documented capabilities.</h2>
             <p>
               Each module supports its original ten workflows plus fifteen
               additional tools. Shared account and reporting tools are
@@ -1780,11 +1839,11 @@ function App() {
             </button>
             <button
               className="icon-button notification"
-              aria-label="View attention items"
-              onClick={() => go("maintenance")}
+              aria-label="View followed record updates"
+              onClick={() => setModal({ type: "updates" })}
             >
               <Icon name="Bell" />
-              {work.length > 0 && <i />}
+              {unreadCount > 0 && <i />}
             </button>
             {isAdmin && (
               <button
@@ -1866,6 +1925,7 @@ function App() {
       </main>
       {modal && (
         <Modal
+          onHubRefresh={() => setHubRevision((n) => n + 1)}
           key={modal.type + (modal.record?.id || "")}
           {...{
             modal,
@@ -2229,6 +2289,7 @@ function Modal({
   tell,
   refresh,
   setTeam,
+  onHubRefresh,
 }) {
   const [accountRole, setAccountRole] = useState(modal.record?.role || "agent");
   const [localError, setLocalError] = useState(""),
@@ -2392,6 +2453,18 @@ function Modal({
             <small>Submitted through the public website</small>
           </div>
         )}
+        <RecordHub
+          api={api}
+          record={record}
+          records={records}
+          modules={modules}
+          canEdit={canEdit}
+          onRefresh={onHubRefresh}
+          onOpenRecord={(id) => {
+            const next = records.find((r) => r.id === id);
+            if (next) setModal({ type: "detail", record: next });
+          }}
+        />
         <RecordCollaboration api={api} record={record} canEdit={canEdit} />
         <div className="record-meta">
           Created {new Date(record.createdAt).toLocaleString()}
@@ -2497,6 +2570,19 @@ function Modal({
           </button>
         </div>
       </>
+    );
+  }
+  if (modal.type === "updates") {
+    title = "Updates you follow";
+    subtitle = "Stay connected to changes in your records.";
+    body = (
+      <FollowedUpdates
+        api={api}
+        onOpenRecord={(id) => {
+          const next = records.find((r) => r.id === id);
+          if (next) setModal({ type: "detail", record: next });
+        }}
+      />
     );
   }
   if (modal.type === "confirm") {

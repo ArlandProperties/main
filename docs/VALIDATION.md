@@ -3,7 +3,7 @@
 ## Local checks
 
 - Production Vite build passes.
-- 70 API tests pass using temporary SQLite databases.
+- 93 API tests pass using temporary SQLite databases.
 - All 20 modules: create, read, edit, archive, restore, domain action, and persistence through authenticated requests.
 - One-time and expired activation links, disabled pending accounts, owner setup, secret validation, session authentication, CSRF header/origin checks, viewer permissions, account disablement, administrator password reset, password rotation, logout, and duplicate account checks.
 - Reference validation, linked-record archive guards, HTTPS-only document links, date validation, and optimistic concurrency.
@@ -23,7 +23,7 @@ Desktop Chromium at 1440×1100 and mobile viewport at 390×844:
 - Loading the optional sample portfolio.
 - All 20 module screens, empty search, status filter, sorting, CSV downloads, archived view.
 - Task creation, details, domain action, editing, archive confirmation, and restore.
-- Exactly 200 feature catalog entries.
+- Exactly 1,200 feature catalog entries (200 original, 300 earlier additions, and 700 record-workspace capabilities).
 - Calendar rendering and month selection.
 - Mobile navigation and absence of horizontal page overflow.
 - No uncaught browser JavaScript errors in the tested flows.
@@ -32,7 +32,7 @@ Run with `npm run test:browser` after `npx playwright install chromium`. To use 
 
 ## CI and deployment checks
 
-GitHub Actions runs the API suite against both SQLite and PostgreSQL 16, builds the application, and runs browser checks. The PostgreSQL 16 CI job passed for the preceding release. Portal isolation tests also run in a separate temporary PostgreSQL schema when `TEST_DATABASE_URL` is set. Render deployment and live HTTPS checks must be verified after its reviewed infrastructure plan is approved and applied.
+GitHub Actions runs the API suite against both SQLite and PostgreSQL 16, builds the application, and runs browser checks. The PostgreSQL 16 CI job is checked again for each pushed release. Portal isolation tests also run in a separate temporary PostgreSQL schema when `TEST_DATABASE_URL` is set. Render deployment and live HTTPS checks must be verified after its reviewed infrastructure plan is approved and applied.
 
 The checks cover implemented behavior; they are not an independent security audit, accessibility certification, financial compliance review, or load test.
 
@@ -40,4 +40,8 @@ The checks cover implemented behavior; they are not an independent security audi
 
 The expanded suite exercises durable module preferences, saved views, bookmarks, comments/history, and bulk archive/restore/status operations in all 20 modules. It checks stale-version atomic rollback, malformed bulk items, per-user preferences, read-only account rejection, explicit rental publication, applicant consent, invalid dates, honeypot checks, private-unit rejection, and receipt preservation when staff edits an application. The extra feature catalog contains exactly 300 entries (15 per module).
 
-Browser coverage includes advanced field/date/numeric filters, saved views, per-module bookmarks, density/page size, multi-selection, bulk confirmation, duplication, internal comments/history, 500 catalog entries, and the mobile public application confirmation. Branding checks find no green-family CSS colors.
+Browser coverage includes advanced field/date/numeric filters, saved views, per-module bookmarks, density/page size, multi-selection, bulk confirmation, duplication, internal comments/history, 1,200 catalog entries, and the mobile public application confirmation. Branding checks find no green-family CSS colors.
+
+## Record workspace and discovery verification
+
+The new API suite exercises all 20 modules for tags/rename, follow-up date/priority/assignment, review state changes and notes, checklist add/edit/complete/remove, related and inbound links, follows, unread updates/read markers, pins, completeness, optimistic locking, and role restrictions. The new catalog has exactly 700 unique entries, 35 per module. Browser checks cover the sharp photo/zoom viewer, home-vibe quiz, moving estimates/checklist, rental favourites/comparison, record-workspace interactions, filters, internal brief download, and reduced-motion support.

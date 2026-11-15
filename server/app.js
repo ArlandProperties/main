@@ -8,6 +8,7 @@ import {
   moduleMap,
   featureCatalog,
   expandedFeatureCatalog,
+  recordHubFeatureCatalog,
 } from "../shared/modules.js";
 import {
   hashToken,
@@ -34,6 +35,7 @@ import {
 } from "./access.js";
 import { installProspectRoutes } from "./public-applications.js";
 import { installModuleTools } from "./module-tools.js";
+import { installRecordHub } from "./record-hub.js";
 const now = () => new Date().toISOString();
 const emailOk = (e) =>
   typeof e === "string" &&
@@ -367,6 +369,7 @@ export function createApp(
     res.json({ ok: true });
   });
   installModuleTools(app, db);
+  installRecordHub(app, db);
   app.get("/api/auth/me", (req, res) =>
     res.json({ user: publicUser(req.user) }),
   );
@@ -424,7 +427,11 @@ export function createApp(
             : modules,
       features: ["agent", "tenant"].includes(req.user.role)
         ? []
-        : [...featureCatalog, ...expandedFeatureCatalog],
+        : [
+            ...featureCatalog,
+            ...expandedFeatureCatalog,
+            ...recordHubFeatureCatalog,
+          ],
       records: scopedRecords(req.user, rows.map(decode)),
       user: publicUser(req.user),
       settings: setting
@@ -921,6 +928,7 @@ export function createApp(
     );
     res.json({
       format: 1,
+      recordWorkspaces: await db.query("SELECT * FROM record_hubs"),
       comments: await db.query("SELECT * FROM comments ORDER BY created_at"),
       exportedAt: now(),
       records: (await db.query("SELECT * FROM records")).map(decode),
